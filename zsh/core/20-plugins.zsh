@@ -3,6 +3,9 @@
 # rebuilt only when that list changes, so a normal startup sources one file.
 
 export ANTIDOTE_HOME=$L0TH1_DATA/plugins
+# Always use our oh-my-zsh clone, even if a parent shell exported another $ZSH
+# (use-omz keeps an existing $ZSH).
+export ZSH=$ANTIDOTE_HOME/ohmyzsh/ohmyzsh
 zstyle ':antidote:bundle' use-friendly-names on
 
 () {

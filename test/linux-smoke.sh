@@ -22,6 +22,8 @@ for profiles in "server" "desktop dev"; do
   zsh -ic 'exit' >/dev/null 2>&1                   # first start: clones antidote + plugins
   out=$(zsh -ic 'whence -w pathadd gfpush l0th1; print -r -- "theme=$ZSH_THEME"' 2>&1)
   echo "$out"
+  zsh -ic 'print -l $L0TH1_LAYERS' 2>/dev/null | grep -q '/zsh/os/linux$' || { echo "FAIL: os/linux layer not loaded"; exit 1; }
+  echo "os layer ok"
   if grep -qiE 'error|not found|no such' <<<"$out" && ! grep -q 'gfpush: none' <<<"$out"; then
     echo "FAIL: unexpected output"; exit 1
   fi

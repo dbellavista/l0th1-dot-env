@@ -132,7 +132,7 @@ test/linux-smoke.sh            # fresh Debian container: server + desktop/dev in
 bin/l0th1                 install/update/status/doctor/push-all
 zsh/zshrc                entrypoint (layer loader)
 zsh/core/                options, PATH, plugins (antidote), tools, update notice, base functions
-zsh/os/                  darwin.zsh, linux.zsh
+zsh/os/<darwin|linux>/   OS-specific PATH, Homebrew, aliases
 zsh/profiles/            desktop/, dev/, server/
 vim/vimrc                entrypoint
 vim/core/                options, plugins, ui, editing, filetypes, commands
