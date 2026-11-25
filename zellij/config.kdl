@@ -1,0 +1,10 @@
+// l0th1 base zellij config, shared by every machine.
+//
+// Only settings that differ from zellij's defaults live here. There is no
+// keybinds block on purpose: each machine gets the default keybindings of its
+// own zellij version, so older and newer versions both accept this file.
+// The machine's default theme is appended by `l0th1` (see `l0th1 zellij-theme`).
+
+show_startup_tips false
+default_mode "normal"
+copy_on_select true

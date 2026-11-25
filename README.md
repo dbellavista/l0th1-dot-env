@@ -121,6 +121,34 @@ automatically, because these files run as code in every shell. Turn the notice o
 Typical flow: edit here, commit, push, then `l0th1 push-all` (or let each
 machine show the notice).
 
+## Zellij
+
+The public repo and each overlay can have a `zellij/` folder:
+
+```
+zellij/config.kdl          base config (public repo only): settings only, no keybinds dump,
+                           so every zellij version uses its own default keybindings
+zellij/themes/<name>.kdl   colour schemes (gothic here; identifai in the identifai overlay)
+zellij/layouts/<name>.kdl  layouts, started with `zellij --layout <name>`
+zellij/<other>.kdl         any other file, e.g. an extra config used with --config
+```
+
+`l0th1 install`/`update` link every `*.kdl` into `~/.config/zellij/` (later
+repos win) and generate `~/.config/zellij/config.kdl`: the base config plus
+this machine's default theme. Links from a repo or overlay you remove are
+cleaned up, and a `config.kdl` changed outside l0th1 (e.g. by zellij's
+settings screen) is backed up before it is replaced.
+
+| Command | Does |
+|---|---|
+| `l0th1 zellij-theme` | show this machine's theme and the themes available |
+| `l0th1 zellij-theme gothic` | set it (saved in `machine.zsh`). Running sessions switch live. |
+| `l0th1 zellij-theme none` | back to zellij's default |
+
+A theme passed on the command line (`zellij options --theme X`) only applies
+when a session is *created*. Attaching to an existing session ignores it. The
+config file theme, on the other hand, is reloaded live.
+
 ## Commands
 
 These live in `zsh/core/bin/` and are on PATH on every machine. Run any of them with `-h` for help.
@@ -148,4 +176,5 @@ zsh/profiles/            desktop/, dev/, server/
 vim/vimrc                entrypoint
 vim/core/                options, plugins, ui, editing, filetypes, commands
 vim/{autoload,colors,keymap,templates}/
+zellij/                  base config, themes, layouts (see Zellij)
 ```
