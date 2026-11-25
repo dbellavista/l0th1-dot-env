@@ -11,7 +11,8 @@ endfor
 call plug#begin(g:l0th1_vim_data . '/plugged')
 
 " Base: no build step.
-" fzf.vim needs the fzf binary: fzf#install() downloads one if it is not on PATH.
+" fzf.vim needs the fzf binary: fzf#install() downloads a matching one into the
+" plugin dir (needs curl or wget), so the system fzf version doesn't matter.
 Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
 Plug 'junegunn/fzf.vim'
 Plug 'tpope/vim-fugitive'

@@ -92,5 +92,7 @@ set nowrap
 " }}}
 
 " Section: Diff {{{
-set diffopt+=algorithm:histogram,indent-heuristic,linematch:60
+set diffopt+=algorithm:histogram,indent-heuristic
+" linematch needs Vim 9.1.1009+ (older Debian/Windows builds reject it).
+silent! set diffopt+=linematch:60
 " }}}

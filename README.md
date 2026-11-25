@@ -43,7 +43,7 @@ Vim follows the same idea: `vim/core/*.vim`, then
 | Profile | For | Adds |
 |---|---|---|
 | `desktop` | personal workstations | gpg-agent as SSH agent (not inside SSH sessions), autojump, vscode |
-| `dev` | anywhere I write code | python/pip/rust/... OMZ plugins, `i`/`itest`/`gfpush`; vim YouCompleteMe, ALE, jsdoc (these need build tools) |
+| `dev` | anywhere I write code | python/pip/rust/... OMZ plugins, `i`/`itest`/`gfpush`; vim LSP client (yegappan/lsp) for Python (`ty`, `ruff`) and markdown (`marksman`); servers that aren't installed are skipped |
 | `server` | headless boxes | base only |
 | `android` | *(identifai overlay)* | scrcpy/adb helpers |
 
@@ -121,6 +121,34 @@ automatically, because these files run as code in every shell. Turn the notice o
 Typical flow: edit here, commit, push, then `l0th1 push-all` (or let each
 machine show the notice).
 
+## Vim
+
+Vim 9.1+ (works on 9.0 with fewer extras). Plugins are kept minimal: fzf.vim,
+fugitive, signify, unimpaired, suda, the edge theme, and (dev profile) the
+yegappan/lsp client. Language servers for the dev profile:
+
+```sh
+uv tool install ty        # Python types, hover, goto, completion
+brew install ruff marksman  # Python lint/format; markdown links and headings
+```
+
+Buffers reload by themselves when an agent changes the file on disk, and swap
+files live in `~/.local/state/vim/swap`, not in the project.
+
+| Keys | Action |
+|---|---|
+| `<space>f` / `<space>/` / `<space>*` | find file / ripgrep / ripgrep word under cursor |
+| `<space>b` / `<space>h` / `<space>g` | buffers / recent files / files changed in git |
+| `<space>d` / `<space>s` | diff the file against git / fugitive status |
+| `]c` `[c` / `<space>p` / `<space>u` | next/prev hunk / show hunk diff / undo hunk |
+| `<space>r` | copy `path:line` (or `path:start-end` in visual mode) for an agent prompt |
+| `gd` `gD` `gr` `K` | definition / peek definition / references / hover (LSP) |
+| `[d` `]d` / `<space>e` | prev/next diagnostic / list diagnostics (LSP) |
+| `\rn` `\ca` `\s` `<C-Q>` | rename / code action / symbols / format (LSP) |
+| `gc` | comment toggle (Vim's bundled `comment` package) |
+| `\t` | file tree (netrw) |
+| `:HelpToc` | outline of markdown headings |
+
 ## Zellij
 
 The public repo and each overlay can have a `zellij/` folder:
@@ -175,7 +203,7 @@ zsh/core/                options, PATH, plugins (antidote), tools, update notice
 zsh/os/<darwin|linux>/   OS-specific PATH, Homebrew, aliases
 zsh/profiles/            desktop/, dev/, server/
 vim/vimrc                entrypoint
-vim/core/                options, plugins, ui, editing, filetypes, commands
+vim/core/                options, plugins, lsp, ui, editing, filetypes, commands
 vim/{autoload,colors,keymap}/
 zellij/                  base config, themes, layouts (see Zellij)
 ```

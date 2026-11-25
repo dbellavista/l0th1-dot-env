@@ -10,7 +10,7 @@ docker run --rm -i -v "$repo:/src:ro" "$image" bash -s <<'IN'
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq >/dev/null
-apt-get install -y -qq zsh git vim ca-certificates pv zstd >/dev/null
+apt-get install -y -qq zsh git vim ca-certificates curl pv zstd >/dev/null
 useradd -m -s /bin/zsh tester
 cp -r /src /home/tester/l0th1-dot-env && chown -R tester: /home/tester/l0th1-dot-env
 su - tester -c 'bash -s' <<'USER'
@@ -32,7 +32,7 @@ done
 again=$(~/.local/bin/l0th1 install 2>&1)
 if grep -qE 'refreshed|backed up|wrote' <<<"$again"; then echo "FAIL: re-install not idempotent: $again"; exit 1; fi
 echo "re-install idempotent"
-if vim -N -u ~/.vim/vimrc -i NONE -es -c 'if !exists("g:plugs") || g:colors_name !=# "edge" | cquit | endif' -c 'qa!' </dev/null; then
+if vim -N -u ~/.vim/vimrc -i NONE -es -c 'if !exists("g:plugs") || g:colors_name !=# "edge" || !executable(g:plugs.fzf.dir . "bin/fzf") || !isdirectory(g:l0th1_vim_data . "/plugged/lsp") | cquit | endif' -c 'qa!' </dev/null; then
   echo "vim ok"
 else
   echo "FAIL: vim config did not load"
