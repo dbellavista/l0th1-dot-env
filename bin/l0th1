@@ -202,9 +202,60 @@ install_zellij() {
   print -rl -- ${(ok)want} >| $manifest
 
   write_zellij_config
+  fetch_zjstatus
+  write_zellij_layout
   if [[ -n $L0TH1_ZELLIJ_THEME && ! -e $ZJ_DIR/themes/$L0TH1_ZELLIJ_THEME.kdl ]]; then
     warn "zellij theme '$L0TH1_ZELLIJ_THEME' is not in any repo (fine if it is one of zellij's built-in themes)"
   fi
+}
+
+# The default layout's top bar is the zjstatus plugin (a wasm file, not kept
+# in git): download it once if this machine does not have it yet.
+fetch_zjstatus() {
+  local w=$ZJ_DIR/plugins/zjstatus.wasm
+  [[ -s $w ]] && return 0
+  mkdir -p ${w:h}
+  if curl -fsSL -o $w.tmp https://github.com/dj95/zjstatus/releases/latest/download/zjstatus.wasm; then
+    mv $w.tmp $w && info "installed $w"
+  else
+    rm -f $w.tmp
+    warn "could not download zjstatus; the default zellij layout needs $w"
+  fi
+}
+
+# Fill the default-layout template with the colours of this machine's theme
+# (ribbon_selected / ribbon_unselected / text_unselected), so the zjstatus bar
+# matches what zellij's own tab bar would show. Without a readable theme file
+# (none set, or a built-in one) it falls back to plain bold/reverse styling.
+write_zellij_layout() {
+  local tpl=$L0TH1_PUBLIC/zellij/default-layout.kdl.tpl out=$ZJ_DIR/layouts/default.kdl
+  [[ -r $tpl ]] || return 0
+  local tf=$ZJ_DIR/themes/$L0TH1_ZELLIJ_THEME.kdl
+  local bar=bold tab=dim active=bold,reverse barbg=default tabbg=default actbg=default
+  if [[ -n $L0TH1_ZELLIJ_THEME && -r $tf ]]; then
+    local c
+    # zj_col SECTION FIELD -> #rrggbb, from the first theme block that has it
+    zj_col() {
+      awk -v sec=$1 -v fld=$2 '$1==sec && $2=="{" {s=1; next} s && $1=="}" {s=0} s && $1==fld {printf "#%02x%02x%02x", $2,$3,$4; exit}' $tf
+    }
+    local bb=$(zj_col text_unselected background) bf=$(zj_col text_unselected base)
+    local tf_=$(zj_col ribbon_unselected base) tb=$(zj_col ribbon_unselected background)
+    local af=$(zj_col ribbon_selected base) ab=$(zj_col ribbon_selected background)
+    if [[ -n $bb$bf$tf_$tb$af$ab && -n $bb && -n $bf && -n $tf_ && -n $tb && -n $af && -n $ab ]]; then
+      bar="fg=$bf,bg=$bb"; tab="fg=$tf_,bg=$tb"; active="fg=$af,bg=$ab,bold"
+      barbg=$bb; tabbg=$tb; actbg=$ab
+    fi
+    unfunction zj_col
+  fi
+  local new
+  new="$ZJ_MARK from $tpl (theme ${L0TH1_ZELLIJ_THEME:-none}).
+$(sed -e "s/@BAR@/$bar/g" -e "s/@TAB@/$tab/g" -e "s/@ACTIVE@/$active/g" -e "s/@BARBG@/$barbg/g" -e "s/@TABBG@/$tabbg/g" -e "s/@ACTBG@/$actbg/g" $tpl)"
+  [[ -f $out && ! -L $out && "$(<$out)" == "$new" ]] && return 0
+  mkdir -p ${out:h}
+  [[ -e $out || -L $out ]] && ! grep -qF -- "$ZJ_MARK" $out 2>/dev/null && backup $out
+  rm -f -- $out
+  print -r -- "$new" >| $out
+  info "wrote $out"
 }
 
 write_zellij_config() {
