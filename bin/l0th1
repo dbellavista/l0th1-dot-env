@@ -271,6 +271,7 @@ cmd_doctor() {
   [[ -d $L0TH1_CONFIG/local ]] && ok "local overrides dir $L0TH1_CONFIG/local"
   local t
   for t in git zsh vim; do (( $+commands[$t] )) && ok "$t found" || { warn "$t not found"; problems=1 }; done
+  path=( $HOME/.local/bin $HOME/.atuin/bin $path )
   for t in atuin autojump gpgconf; do (( $+commands[$t] )) || print -P "  %F{8}info%f $t not installed (optional)"; done
   local old
   for old in $rc ${L0TH1_CONFIG}/local/*.zsh(N); do
@@ -281,12 +282,13 @@ cmd_doctor() {
 }
 
 cmd_push_all() {
-  local dry=0 fwd=()
+  local dry=0 fwd=() only=()
   while (( $# )); do
     case $1 in
       --dry-run) dry=1 ;;
       --forward-agent) fwd=(-A) ;;
-      *) die "push-all: unknown option $1" ;;
+      -*) die "push-all: unknown option $1" ;;
+      *) only+=( $1 ) ;;
     esac
     shift
   done
@@ -309,6 +311,7 @@ cmd_push_all() {
     target=${${=line}[1]} name=${${=line}[2]:-$target}
     [[ -n $target ]] || continue
     [[ $name == $L0TH1_HOST || ${seen[(Ie)$name]} -gt 0 ]] && continue
+    (( $#only )) && (( ! ${only[(Ie)$name]} )) && continue
     seen+=( $name )
     info "$target"
     (( dry )) && { print "  would run: ssh $fwd $target '~/.local/bin/l0th1 update'"; continue }
@@ -331,8 +334,9 @@ l0th1: manage l0th1-dot-env on this machine
   l0th1 status                 machine identity and repo state
   l0th1 doctor                 check the installation
   l0th1 check                  fetch and count upstream commits (the shell runs this daily)
-  l0th1 push-all [--dry-run] [--forward-agent]
+  l0th1 push-all [--dry-run] [--forward-agent] [host...]
                               run 'l0th1 update' on every host in the overlays' machines.txt
+                              (or only the named ones)
 
 Profiles available here: $(available_profiles)
 EOF
