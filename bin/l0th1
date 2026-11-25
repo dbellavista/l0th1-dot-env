@@ -381,9 +381,12 @@ cmd_update() {
 # Background check used by the shell's update notice.
 cmd_check() {
   local r n total=0
-  export GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=5"
+  export GIT_TERMINAL_PROMPT=0
   for r in $(repos); do
-    git -C $r fetch --quiet 2>/dev/null || continue
+    # GIT_SSH_COMMAND overrides core.sshCommand, so build on the repo's own
+    # (a deploy key set by `l0th1 deploy-key`).
+    GIT_SSH_COMMAND="$(git -C $r config core.sshCommand || print ssh) -o BatchMode=yes -o ConnectTimeout=5" \
+      git -C $r fetch --quiet 2>/dev/null || continue
     n=$(git -C $r rev-list --count 'HEAD..@{u}' 2>/dev/null) || n=0
     (( total += n ))
   done
@@ -479,6 +482,37 @@ cmd_push_all() {
   return 0
 }
 
+# Give an overlay repo its own SSH key (a GitHub deploy key: read-only, one
+# repo per key). Stored as core.sshCommand in the repo's .git/config, so every
+# git command in that repo uses it, whatever ssh agent is (or isn't) around.
+cmd_deploy_key() {
+  local name=${1:-} key=${2:-}
+  [[ -n $name ]] || die "usage: l0th1 deploy-key OVERLAY [KEYFILE]"
+  resolve_overlay $name
+  local repo=$REPLY; name=${repo:t}; name=${name#l0th1-dot-env-}
+  [[ -n $key ]] || key=$HOME/.ssh/l0th1-${name}_ed25519
+  key=${key:A}
+  if [[ ! -f $key ]]; then
+    mkdir -p -m 700 ${key:h}
+    ssh-keygen -q -t ed25519 -N '' -C "l0th1 $name deploy key @ $L0TH1_HOST" -f $key || die "ssh-keygen failed"
+    info "created $key"
+  fi
+  git -C $repo config core.sshCommand "ssh -i ${(q)key} -o IdentitiesOnly=yes"
+  info "${repo:t}: git now uses $key"
+
+  local url=$(git -C $repo remote get-url origin 2>/dev/null)
+  [[ $url == (git@|ssh://)* ]] || warn "remote is $url: deploy keys only apply to ssh remotes (git@github.com:...)"
+  if GIT_SSH_COMMAND="ssh -i ${(q)key} -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=5" \
+      git -C $repo ls-remote --quiet origin HEAD >/dev/null 2>&1; then
+    ok "key accepted by origin"
+  else
+    local slug=${${url#*github.com[:/]}%.git}
+    print "\nAdd this public key as a deploy key (read-only)${slug:+ at https://github.com/$slug/settings/keys}:\n"
+    cat $key.pub
+    print "\nThen check with: l0th1 update"
+  fi
+}
+
 usage() {
   cat <<EOF
 l0th1: manage l0th1-dot-env on this machine
@@ -495,6 +529,10 @@ l0th1: manage l0th1-dot-env on this machine
   l0th1 zellij-theme [NAME|none]
                               show or set this machine's default zellij theme
                               (running sessions switch live)
+  l0th1 deploy-key OVERLAY [KEYFILE]
+                              make git use its own SSH key for that overlay (created as
+                              ~/.ssh/l0th1-OVERLAY_ed25519 if missing); prints the public
+                              key to add as a GitHub deploy key
   l0th1 push-all [--dry-run] [--forward-agent] [host...]
                               run 'l0th1 update' on every host in the overlays' machines.txt
                               (or only the named ones)
@@ -510,6 +548,7 @@ case ${1:-help} in
   status)   shift; cmd_status "$@" ;;
   doctor)   shift; cmd_doctor "$@" ;;
   push-all) shift; cmd_push_all "$@" ;;
+  deploy-key) shift; cmd_deploy_key "$@" ;;
   zellij-theme) shift; cmd_zellij_theme "$@" ;;
   help|-h|--help) usage ;;
   *) usage; exit 1 ;;

@@ -111,6 +111,7 @@ the `source` line. Machine-only settings go in `~/_vimrc.local`.
 | `l0th1 update --plugins` | also `antidote update` and `:PlugUpdate` |
 | `l0th1 push-all` | runs `l0th1 update` over SSH on every host listed in the enabled overlays' `machines.txt` (`--dry-run`, `--forward-agent`) |
 | `l0th1 status` / `l0th1 doctor` | machine identity and repo state / installation checks |
+| `l0th1 deploy-key OVERLAY` | give an overlay its own SSH key (see below) |
 
 Shells notice upstream changes by themselves: a background `git fetch` runs at
 most once a day and the next shell prints
@@ -120,6 +121,20 @@ automatically, because these files run as code in every shell. Turn the notice o
 
 Typical flow: edit here, commit, push, then `l0th1 push-all` (or let each
 machine show the notice).
+
+### Deploy keys for overlays
+
+A machine that shouldn't hold your personal SSH key can pull an overlay with a
+read-only GitHub deploy key instead of agent forwarding:
+
+```sh
+l0th1 deploy-key personal     # creates ~/.ssh/l0th1-personal_ed25519, prints the public key
+```
+
+Add the printed key at the repo's *Settings → Deploy keys* (read-only). GitHub
+allows a key on one repo only, so each overlay gets its own. The key is set as
+`core.sshCommand` in that repo's `.git/config`, so `update`, the daily check
+and plain `git pull` all use it.
 
 ## Vim
 
