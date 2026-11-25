@@ -1,0 +1,2 @@
+# i <task...>: run an invoke task through uv.
+uv run inv "$@"

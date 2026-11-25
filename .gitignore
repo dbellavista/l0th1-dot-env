@@ -1,0 +1,8 @@
+.DS_Store
+*.swp
+*.pyc
+__pycache__/
+# Vim writes these into the first runtimepath dir (this repo, via ~/.vim)
+vim/.netrwhist
+vim/.VimballRecord
+vim/spell/

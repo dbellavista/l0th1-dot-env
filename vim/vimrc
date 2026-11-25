@@ -1,0 +1,69 @@
+"
+" l0th1-dot-env vimrc. Vim 8.2+ on macOS, Linux and Windows.
+" Author: Daniele Bellavista
+"
+" Load order (later overrides earlier):
+"   core/*.vim                       shared settings (this repo)
+"   <private>/vim/{common,profiles/<p>,hosts/<host>}/*.vim
+"   ~/.vimrc.local  (~/_vimrc.local on Windows)   machine-only, not in git
+"
+" Plugins: core/plugins.vim; private layers can add Plug lines in plugins.vim.
+" Machine identity comes from $L0TH1_PROFILES / $L0TH1_HOST / $L0TH1_PRIVATE (set by
+" the zsh setup), or from g:l0th1_* set before sourcing this file (Windows).
+
+" Skip initialization for vim-tiny or vim-small.
+if !1 | finish | endif
+set nocompatible
+
+let g:l0th1_vim = expand('<sfile>:p:h')
+let g:l0th1_profiles = get(g:, 'l0th1_profiles', split($L0TH1_PROFILES))
+let g:l0th1_host = get(g:, 'l0th1_host', empty($L0TH1_HOST) ? hostname() : $L0TH1_HOST)
+let g:l0th1_private = get(g:, 'l0th1_private', $L0TH1_PRIVATE)
+
+" Plugins and undo history live outside the repo.
+if has('win32')
+  let g:l0th1_vim_data = expand('$LOCALAPPDATA') . '/vim'
+  let g:l0th1_vim_state = g:l0th1_vim_data
+else
+  let g:l0th1_vim_data = (empty($XDG_DATA_HOME) ? expand('~/.local/share') : $XDG_DATA_HOME) . '/vim'
+  let g:l0th1_vim_state = (empty($XDG_STATE_HOME) ? expand('~/.local/state') : $XDG_STATE_HOME) . '/vim'
+endif
+
+" When sourced from somewhere other than ~/.vim (Windows, `vim -u`), put the
+" repo on the runtimepath so autoload/, colors/ and keymap/ are found.
+if index(map(split(&runtimepath, ','), 'resolve(expand(v:val))'), resolve(g:l0th1_vim)) < 0
+  let &runtimepath = g:l0th1_vim . ',' . &runtimepath . ',' . g:l0th1_vim . '/after'
+endif
+
+function! L0th1HasProfile(name) abort
+  return index(g:l0th1_profiles, a:name) >= 0
+endfunction
+
+" Private layer directories, lowest to highest precedence.
+function! L0th1PrivateDirs() abort
+  if empty(g:l0th1_private) || !isdirectory(g:l0th1_private . '/vim')
+    return []
+  endif
+  let l:base = g:l0th1_private . '/vim/'
+  let l:dirs = [l:base . 'common']
+  call extend(l:dirs, map(copy(g:l0th1_profiles), 'l:base . "profiles/" . v:val'))
+  call add(l:dirs, l:base . 'hosts/' . g:l0th1_host)
+  return filter(l:dirs, 'isdirectory(v:val)')
+endfunction
+
+for s:name in ['options', 'plugins', 'ui', 'editing', 'filetypes', 'commands']
+  execute 'source' fnameescape(g:l0th1_vim . '/core/' . s:name . '.vim')
+endfor
+
+for s:dir in L0th1PrivateDirs()
+  for s:file in sort(glob(s:dir . '/*.vim', 0, 1))
+    if fnamemodify(s:file, ':t') !=# 'plugins.vim'
+      execute 'source' fnameescape(s:file)
+    endif
+  endfor
+endfor
+
+let s:local = expand(has('win32') ? '~/_vimrc.local' : '~/.vimrc.local')
+if filereadable(s:local)
+  execute 'source' fnameescape(s:local)
+endif

@@ -1,0 +1,6 @@
+# itest <filter> | itest <args...>: run the project's test.run invoke task.
+if (( $# == 1 )); then
+  uv run inv test.run --no-rtk -f $1
+else
+  uv run inv test.run --no-rtk "$@"
+fi

@@ -1,0 +1,2 @@
+# stitle <title...>: set the terminal window title.
+print -n -- "\e]2;$*\a"

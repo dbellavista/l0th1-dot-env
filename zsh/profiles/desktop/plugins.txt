@@ -1,0 +1,2 @@
+# Personal workstations (laptop, desktop, mini).
+ohmyzsh/ohmyzsh path:plugins/vscode

@@ -1,0 +1,5 @@
+# gfpush: push develop, main and tags (git-flow release finish).
+# Uses plain git: autoloaded functions don't expand aliases like gco/ggp.
+git checkout develop && git push origin develop &&
+  git checkout main && git push origin main &&
+  git push origin --tags

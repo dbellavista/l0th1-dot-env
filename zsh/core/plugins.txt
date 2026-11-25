@@ -1,0 +1,16 @@
+# Base plugins: loaded on every machine. Profiles add more in their own plugins.txt.
+getantidote/use-omz
+ohmyzsh/ohmyzsh path:lib
+ohmyzsh/ohmyzsh path:plugins/git
+ohmyzsh/ohmyzsh path:plugins/vi-mode
+ohmyzsh/ohmyzsh path:plugins/colored-man-pages
+ohmyzsh/ohmyzsh path:plugins/cp
+ohmyzsh/ohmyzsh path:plugins/encode64
+ohmyzsh/ohmyzsh path:plugins/rsync
+ohmyzsh/ohmyzsh path:plugins/command-not-found
+zsh-users/zsh-autosuggestions
+
+# Deferred until after the prompt, like zplug's defer:2.
+zsh-users/zsh-syntax-highlighting kind:defer
+zsh-vi-more/evil-registers kind:defer
+zsh-vi-more/vi-motions kind:defer

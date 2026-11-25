@@ -1,0 +1,309 @@
+#!/usr/bin/env zsh
+# l0th1: install, update and inspect the l0th1-dot-env setup on this machine.
+# Run `l0th1 help` for usage.
+
+emulate -R zsh
+setopt extended_glob pipe_fail
+
+SELF=${0:A}
+L0TH1_PUBLIC=${SELF:h:h}
+L0TH1_CONFIG=${XDG_CONFIG_HOME:-$HOME/.config}/l0th1
+L0TH1_DATA=${XDG_DATA_HOME:-$HOME/.local/share}/l0th1
+L0TH1_CACHE=${XDG_CACHE_HOME:-$HOME/.cache}/l0th1
+L0TH1_STATE=${XDG_STATE_HOME:-$HOME/.local/state}/l0th1
+MACHINE=$L0TH1_CONFIG/machine.zsh
+TS=$(date +%Y%m%d-%H%M%S)
+BLOCK_BEGIN='# >>> l0th1-dot-env >>>'
+BLOCK_END='# <<< l0th1-dot-env <<<'
+
+L0TH1_HOST= L0TH1_PROFILES= L0TH1_PRIVATE=
+[[ -r $MACHINE ]] && source $MACHINE
+
+QUIET=0
+info() { (( QUIET )) || print -P "%F{blue}==>%f $1" }
+ok()   { print -P "  %F{green}ok%f   $1" }
+warn() { print -P -u2 "  %F{yellow}warn%f $1" }
+die()  { print -P -u2 "%F{red}error:%f $1"; exit 1 }
+
+repos() {
+  print -r -- $L0TH1_PUBLIC
+  [[ -n $L0TH1_PRIVATE && -d $L0TH1_PRIVATE/.git ]] && print -r -- $L0TH1_PRIVATE
+}
+
+available_profiles() {
+  local -a dirs=( $L0TH1_PUBLIC/zsh/profiles/*(N/:t) )
+  [[ -n $L0TH1_PRIVATE ]] && dirs+=( $L0TH1_PRIVATE/zsh/profiles/*(N/:t) )
+  print -r -- ${(u)dirs}
+}
+
+# Move a file aside into this run's backup dir.
+backup() {
+  local target=$1 dir=$L0TH1_STATE/backups/$TS
+  [[ -e $target || -L $target ]] || return 0
+  mkdir -p $dir && mv $target $dir/ && info "backed up $target -> $dir/${target:t}"
+}
+
+# Symlink src -> dst. Returns 0 if it created the link, 1 if it was already in place.
+link() {
+  local src=$1 dst=$2
+  [[ -L $dst && ${dst:A} == ${src:A} ]] && return 1
+  backup $dst
+  mkdir -p ${dst:h}
+  ln -s $src $dst && info "linked $dst -> $src"
+}
+
+write_machine() {
+  mkdir -p $L0TH1_CONFIG/local
+  local extra=""
+  # Keep any hand-added settings (lines that aren't the three managed keys).
+  [[ -r $MACHINE ]] && extra=$(grep -vE '^(#|L0TH1_HOST=|L0TH1_PROFILES=|L0TH1_PRIVATE=)' $MACHINE)
+  {
+    print -r -- "# l0th1 machine identity: written by \`l0th1 install\`, safe to edit."
+    print -r -- "L0TH1_HOST=${(qq)L0TH1_HOST}"
+    print -r -- "L0TH1_PROFILES=${(qq)L0TH1_PROFILES}"
+    print -r -- "L0TH1_PRIVATE=${(qq)L0TH1_PRIVATE}"
+    [[ -n $extra ]] && print -r -- $extra
+  } >| $MACHINE
+}
+
+# Write (or refresh) the managed block in ~/.zshrc. Lines outside the block,
+# for example ones installers append, are left alone.
+install_zshrc() {
+  local rc=${ZDOTDIR:-$HOME}/.zshrc
+  local -a block=(
+    $BLOCK_BEGIN
+    "# Managed by \`l0th1 install\`. Machine settings: $L0TH1_CONFIG/machine.zsh"
+    "# Local tweaks and secrets: $L0TH1_CONFIG/local/*.zsh (not in any repo)."
+    "if [[ -r ${(qq)L0TH1_PUBLIC}/zsh/zshrc ]]; then"
+    "  source ${(qq)L0TH1_PUBLIC}/zsh/zshrc"
+    "else"
+    "  print -u2 'l0th1: ${L0TH1_PUBLIC}/zsh/zshrc not found, run l0th1 install'"
+    "fi"
+    $BLOCK_END
+  )
+  local -a lines out
+  if [[ -f $rc ]] && grep -qF -- $BLOCK_BEGIN $rc; then
+    lines=( "${(@f)$(<$rc)}" )
+    local skip=0 l
+    for l in "${lines[@]}"; do
+      if [[ $l == $BLOCK_BEGIN ]]; then out+=( $block ); skip=1; continue; fi
+      if [[ $l == $BLOCK_END ]]; then skip=0; continue; fi
+      (( skip )) || out+=( "$l" )
+    done
+    if [[ "${(F)out}" != "${(F)lines}" ]]; then
+      print -r -- "${(F)out}" >| $rc
+      info "refreshed l0th1 block in $rc"
+    fi
+  else
+    backup $rc
+    {
+      print -r -- ${(F)block}
+      print
+      print -r -- "# Lines added below by other tools stay on this machine only."
+    } >| $rc
+    info "wrote $rc"
+  fi
+}
+
+vim_plugins() {
+  local cmd=$1
+  (( $+commands[vim] )) || { warn "vim not installed, skipping plugins"; return }
+  info "vim: $cmd"
+  export L0TH1_HOST L0TH1_PROFILES L0TH1_PRIVATE
+  vim -N -u $L0TH1_PUBLIC/vim/vimrc -i NONE -es -c "$cmd" -c 'qa!' </dev/null
+}
+
+install_vim() {
+  local fresh=0
+  link $L0TH1_PUBLIC/vim $HOME/.vim && fresh=1
+  # ~/.vimrc would shadow ~/.vim/vimrc.
+  [[ -e $HOME/.vimrc || -L $HOME/.vimrc ]] && backup $HOME/.vimrc
+  (( fresh || INSTALL_PLUGINS )) && vim_plugins 'PlugInstall --sync'
+}
+
+# ---------------------------------------------------------------- commands
+
+cmd_install() {
+  local host=$L0TH1_HOST profiles=$L0TH1_PROFILES private=$L0TH1_PRIVATE c
+  local no_vim=0 profiles_given=0
+  INSTALL_PLUGINS=0
+  while (( $# )); do
+    case $1 in
+      --host)       host=$2; shift 2 ;;
+      --profiles)   profiles=$2; profiles_given=1; shift 2 ;;
+      --private)    [[ $2 == none ]] && private=NONE || private=${2:A}; shift 2 ;;
+      --no-vim)     no_vim=1; shift ;;
+      --plugins)    INSTALL_PLUGINS=1; shift ;;
+      --quiet)      QUIET=1; shift ;;
+      -h|--help)    usage; return ;;
+      *)            die "install: unknown option $1" ;;
+    esac
+  done
+
+  [[ -n $host ]] || host=${HOST%%.*}
+  if [[ $private == NONE ]]; then
+    private=
+  elif [[ -z $private ]]; then
+    for c in ${L0TH1_PUBLIC:h}/${L0TH1_PUBLIC:t}-private $L0TH1_DATA/private; do
+      [[ -d $c/.git ]] && { private=${c:A}; break }
+    done
+  fi
+  [[ -z $private || -d $private/zsh ]] || die "$private is not an l0th1 private repo (no zsh/ dir)"
+
+  L0TH1_HOST=$host L0TH1_PROFILES=$profiles L0TH1_PRIVATE=$private
+
+  local p known=" $(available_profiles) "
+  for p in ${=L0TH1_PROFILES}; do
+    [[ $known == *" $p "* ]] || warn "profile '$p' has no directory in either repo"
+  done
+  if [[ -z $L0TH1_PROFILES && $profiles_given == 0 ]]; then
+    warn "no profiles set. Available: $(available_profiles). Use --profiles \"desktop dev\"."
+  fi
+
+  write_machine
+  mkdir -p $L0TH1_STATE $L0TH1_CACHE $L0TH1_CONFIG/local
+  link $SELF $HOME/.local/bin/l0th1 || true
+  install_zshrc
+  (( no_vim )) || install_vim
+
+  info "host=%B$L0TH1_HOST%b profiles=%B${L0TH1_PROFILES:-<none>}%b private=%B${L0TH1_PRIVATE:-<none>}%b"
+  info "done. Open a new shell (first start downloads zsh plugins)."
+}
+
+cmd_update() {
+  local plugins=0 r failed=0
+  [[ ${1:-} == --plugins ]] && plugins=1
+  for r in $(repos); do
+    info "pull ${r:t}"
+    if ! git -C $r pull --ff-only --quiet; then
+      warn "pull failed in $r (local changes or diverged history?)"
+      failed=1
+    fi
+  done
+  mkdir -p $L0TH1_STATE && print 0 >| $L0TH1_STATE/behind
+  # Pick up layout changes (moved repo, new stub format). Plugins only on request.
+  cmd_install --quiet
+  if (( plugins )); then
+    info "zsh plugins: antidote update"
+    zsh -c "export ANTIDOTE_HOME=${(q)L0TH1_DATA}/plugins; zstyle ':antidote:bundle' use-friendly-names on;
+            source ${(q)L0TH1_DATA}/antidote/antidote.zsh && antidote update" || failed=1
+    vim_plugins 'PlugUpdate --sync'
+  fi
+  (( failed )) && return 1
+  info "updated. Open a new shell (or run: exec zsh)."
+}
+
+# Background check used by the shell's update notice.
+cmd_check() {
+  local r n total=0
+  export GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=5"
+  for r in $(repos); do
+    git -C $r fetch --quiet 2>/dev/null || continue
+    n=$(git -C $r rev-list --count 'HEAD..@{u}' 2>/dev/null) || n=0
+    (( total += n ))
+  done
+  mkdir -p $L0TH1_STATE && print $total >| $L0TH1_STATE/behind
+  print $total
+}
+
+cmd_status() {
+  print -P "%Bmachine%b  host=$L0TH1_HOST  os=$OSTYPE  profiles=${L0TH1_PROFILES:-<none>}"
+  local r branch dirty ab
+  for r in $(repos); do
+    branch=$(git -C $r rev-parse --abbrev-ref HEAD 2>/dev/null)
+    dirty=$(git -C $r status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    ab=$(git -C $r rev-list --left-right --count 'HEAD...@{u}' 2>/dev/null | awk '{print "ahead " $1 ", behind " $2}')
+    print -P "%Brepo%b     $r  [$branch] ${ab:-no upstream}, $dirty uncommitted change(s)"
+  done
+}
+
+cmd_doctor() {
+  local rc=${ZDOTDIR:-$HOME}/.zshrc problems=0
+  print -P "%Bl0th1 doctor%b ($L0TH1_HOST)"
+  [[ -r $MACHINE ]] && ok "machine config $MACHINE" || { warn "no $MACHINE: run l0th1 install"; problems=1 }
+  grep -qF -- $BLOCK_BEGIN $rc 2>/dev/null && ok "$rc has the l0th1 block" || { warn "$rc has no l0th1 block"; problems=1 }
+  local v=$HOME/.vim want=$L0TH1_PUBLIC/vim
+  [[ -L $v && ${v:A} == ${want:A} ]] && ok "~/.vim -> repo" || warn "~/.vim is not linked to $L0TH1_PUBLIC/vim"
+  [[ -e $HOME/.vimrc ]] && warn "~/.vimrc exists and shadows ~/.vim/vimrc"
+  [[ -r $L0TH1_DATA/antidote/antidote.zsh ]] && ok "antidote installed" || warn "antidote missing (installed on next shell start)"
+  if [[ -n $L0TH1_PRIVATE ]]; then
+    [[ -d $L0TH1_PRIVATE/zsh ]] && ok "private repo $L0TH1_PRIVATE" || { warn "private repo $L0TH1_PRIVATE missing"; problems=1 }
+  else
+    ok "no private repo (public only)"
+  fi
+  [[ -d $L0TH1_CONFIG/local ]] && ok "local overrides dir $L0TH1_CONFIG/local"
+  local t
+  for t in git zsh vim; do (( $+commands[$t] )) && ok "$t found" || { warn "$t not found"; problems=1 }; done
+  for t in atuin autojump gpgconf; do (( $+commands[$t] )) || print -P "  %F{8}info%f $t not installed (optional)"; done
+  local old
+  for old in $rc ${L0TH1_CONFIG}/local/*.zsh(N); do
+    grep -q 'zplug' $old 2>/dev/null && warn "$old still mentions zplug (the old plugin manager)"
+  done
+  zsh -n $L0TH1_PUBLIC/zsh/zshrc && ok "zshrc syntax"
+  return $problems
+}
+
+cmd_push_all() {
+  local dry=0 fwd=()
+  while (( $# )); do
+    case $1 in
+      --dry-run) dry=1 ;;
+      --forward-agent) fwd=(-A) ;;
+      *) die "push-all: unknown option $1" ;;
+    esac
+    shift
+  done
+  local list=${L0TH1_PRIVATE:-/nonexistent}/machines.txt
+  [[ -r $list ]] || die "no machines.txt in the private repo"
+
+  # Remote machines pull from the git remote, so local commits must be pushed first.
+  local r
+  for r in $(repos); do
+    if [[ -n $(git -C $r status --porcelain 2>/dev/null) ]] ||
+       (( $(git -C $r rev-list --count '@{u}..HEAD' 2>/dev/null || print 0) > 0 )); then
+      warn "${r:t} has uncommitted or unpushed changes; other machines won't see them"
+    fi
+  done
+
+  local line target name failed=()
+  for line in "${(@f)$(grep -vE '^[[:space:]]*(#|$)' $list)}"; do
+    target=${${=line}[1]} name=${${=line}[2]:-$target}
+    [[ $name == $L0TH1_HOST ]] && continue
+    info "$target"
+    (( dry )) && { print "  would run: ssh $fwd $target '~/.local/bin/l0th1 update'"; continue }
+    ssh $fwd -o BatchMode=yes -o ConnectTimeout=5 $target '~/.local/bin/l0th1 update' 2>&1 \
+      | sed "s/^/  [$name] /" || failed+=( $name )
+  done
+  (( $#failed )) && { warn "failed: ${failed[*]}"; return 1 }
+  return 0
+}
+
+usage() {
+  cat <<EOF
+l0th1: manage l0th1-dot-env on this machine
+
+  l0th1 install [--host NAME] [--profiles "p1 p2"] [--private DIR|none] [--no-vim] [--plugins]
+      Write ~/.config/l0th1/machine.zsh, the ~/.zshrc block and the ~/.vim link.
+      Safe to re-run; anything it replaces is moved to $L0TH1_STATE/backups/.
+  l0th1 update [--plugins]     git pull both repos (fast-forward only), refresh links;
+                              --plugins also updates zsh and vim plugins
+  l0th1 status                 machine identity and repo state
+  l0th1 doctor                 check the installation
+  l0th1 check                  fetch and count upstream commits (the shell runs this daily)
+  l0th1 push-all [--dry-run] [--forward-agent]
+                              run 'l0th1 update' on every host in the private machines.txt
+
+Profiles available here: $(available_profiles)
+EOF
+}
+
+case ${1:-help} in
+  install)  shift; cmd_install "$@" ;;
+  update)   shift; cmd_update "$@" ;;
+  check)    shift; cmd_check "$@" ;;
+  status)   shift; cmd_status "$@" ;;
+  doctor)   shift; cmd_doctor "$@" ;;
+  push-all) shift; cmd_push_all "$@" ;;
+  help|-h|--help) usage ;;
+  *) usage; exit 1 ;;
+esac

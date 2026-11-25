@@ -1,0 +1,2 @@
+# pathadd <dir>: append <dir> to PATH if it exists and is not already there.
+[[ -d $1 ]] && path+=( $1 )
