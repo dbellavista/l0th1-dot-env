@@ -16,7 +16,7 @@ TS=$(date +%Y%m%d-%H%M%S)
 BLOCK_BEGIN='# >>> l0th1-dot-env >>>'
 BLOCK_END='# <<< l0th1-dot-env <<<'
 
-L0TH1_HOST= L0TH1_PROFILES= L0TH1_OVERLAYS=
+L0TH1_HOST= L0TH1_PROFILES= L0TH1_OVERLAYS= L0TH1_VIM=1
 [[ -r $MACHINE ]] && source $MACHINE
 
 QUIET=0
@@ -88,12 +88,13 @@ write_machine() {
   mkdir -p $L0TH1_CONFIG/local
   local extra=""
   # Keep any hand-added settings (lines that aren't the three managed keys).
-  [[ -r $MACHINE ]] && extra=$(grep -vE '^(#|L0TH1_HOST=|L0TH1_PROFILES=|L0TH1_PRIVATE=|L0TH1_OVERLAYS=)' $MACHINE)
+  [[ -r $MACHINE ]] && extra=$(grep -vE '^(#|L0TH1_HOST=|L0TH1_PROFILES=|L0TH1_PRIVATE=|L0TH1_OVERLAYS=|L0TH1_VIM=)' $MACHINE)
   {
     print -r -- "# l0th1 machine identity: written by \`l0th1 install\`, safe to edit."
     print -r -- "L0TH1_HOST=${(qq)L0TH1_HOST}"
     print -r -- "L0TH1_PROFILES=${(qq)L0TH1_PROFILES}"
     print -r -- "L0TH1_OVERLAYS=${(qq)L0TH1_OVERLAYS}"
+    print -r -- "L0TH1_VIM=$L0TH1_VIM    # 0: leave ~/.vim alone (install --no-vim / --vim)"
     [[ -n $extra ]] && print -r -- $extra
   } >| $MACHINE
 }
@@ -157,14 +158,15 @@ install_vim() {
 
 cmd_install() {
   local host=$L0TH1_HOST profiles=$L0TH1_PROFILES overlays_arg= o
-  local no_vim=0 profiles_given=0
+  local profiles_given=0
   INSTALL_PLUGINS=0
   while (( $# )); do
     case $1 in
       --host)       host=$2; shift 2 ;;
       --profiles)   profiles=$2; profiles_given=1; shift 2 ;;
       --overlays)   overlays_arg=$2; shift 2 ;;
-      --no-vim)     no_vim=1; shift ;;
+      --no-vim)     L0TH1_VIM=0; shift ;;
+      --vim)        L0TH1_VIM=1; shift ;;
       --plugins)    INSTALL_PLUGINS=1; shift ;;
       --quiet)      QUIET=1; shift ;;
       -h|--help)    usage; return ;;
@@ -198,7 +200,7 @@ cmd_install() {
   mkdir -p $L0TH1_STATE $L0TH1_CACHE $L0TH1_CONFIG/local
   link $SELF $HOME/.local/bin/l0th1 || true
   install_zshrc
-  (( no_vim )) || install_vim
+  (( L0TH1_VIM )) && install_vim
 
   local names=( $(overlays) ); names=( ${${names:t}#${L0TH1_PUBLIC:t}-} ); names=( ${names#l0th1-dot-env-} )
   info "host=%B$L0TH1_HOST%b profiles=%B${L0TH1_PROFILES:-<none>}%b overlays=%B${names[*]:-<none>}%b"
@@ -321,7 +323,7 @@ usage() {
   cat <<EOF
 l0th1: manage l0th1-dot-env on this machine
 
-  l0th1 install [--host NAME] [--profiles "p1 p2"] [--overlays "o1 o2"|none] [--no-vim] [--plugins]
+  l0th1 install [--host NAME] [--profiles "p1 p2"] [--overlays "o1 o2"|none] [--no-vim|--vim] [--plugins]
       Write ~/.config/l0th1/machine.zsh, the ~/.zshrc block and the ~/.vim link.
       Safe to re-run; anything it replaces is moved to $L0TH1_STATE/backups/.
   l0th1 update [--plugins]     git pull all repos (fast-forward only), refresh links;
