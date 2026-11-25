@@ -220,6 +220,7 @@ cmd_update() {
   mkdir -p $L0TH1_STATE && print 0 >| $L0TH1_STATE/behind
   # Pick up layout changes (moved repo, new stub format). Plugins only on request.
   cmd_install --quiet
+  QUIET=0
   if (( plugins )); then
     info "zsh plugins: antidote update"
     zsh -c "export ANTIDOTE_HOME=${(q)L0TH1_DATA}/plugins; zstyle ':antidote:bundle' use-friendly-names on;
