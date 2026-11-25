@@ -129,6 +129,7 @@ read-only GitHub deploy key instead of agent forwarding:
 
 ```sh
 l0th1 deploy-key personal     # creates ~/.ssh/l0th1-personal_ed25519, prints the public key
+l0th1 deploy-key personal ~/.ssh/existing_key   # or use a key you already have
 ```
 
 Add the printed key at the repo's *Settings → Deploy keys* (read-only). GitHub

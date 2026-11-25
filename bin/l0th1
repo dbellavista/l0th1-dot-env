@@ -508,7 +508,8 @@ cmd_deploy_key() {
   else
     local slug=${${url#*github.com[:/]}%.git}
     print "\nAdd this public key as a deploy key (read-only)${slug:+ at https://github.com/$slug/settings/keys}:\n"
-    cat $key.pub
+    # An existing key may come without its .pub: derive it from the private key.
+    [[ -r $key.pub ]] && cat $key.pub || ssh-keygen -y -f $key
     print "\nThen check with: l0th1 update"
   fi
 }
