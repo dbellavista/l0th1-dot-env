@@ -1,0 +1,105 @@
+#!/usr/bin/env zsh
+# tar_throttled: archive a directory (or file) while capping how fast the source
+# is read, so big archives don't saturate a shared or external disk.
+#
+#   tar_throttled [-r RATE] [-V] ARCHIVE SOURCE
+#
+#   -r RATE   read-rate cap as a pv rate, e.g. 50M, 1G       (default 80M)
+#             0 = no cap (pv not needed)
+#   -V        after writing, read the archive back to check it
+#
+#   ARCHIVE   .tar, .tar.gz / .tgz (pigz if installed, else gzip),
+#             or .tar.zst / .tzst (zstd, all cores)
+#   SOURCE    stored under its own name, like `tar -C <parent> -cf - <name>`
+#
+# The source is read at idle I/O priority. Output goes to ARCHIVE.partial and is
+# renamed to ARCHIVE only after the archive is complete and synced to disk, so
+# an interrupted run never leaves a truncated file under the final name.
+
+emulate -R zsh
+setopt pipe_fail no_unset
+
+self=${ZSH_ARGZERO:t}
+die()  { print -u2 -r -- "$self: $*"; exit 1 }
+usage() {
+  print -u2 -r -- "usage: $self [-r rate] [-V] ARCHIVE SOURCE"
+  exit 2
+}
+
+# Remove the partial archive on every failure path, including die and Ctrl-C.
+partial="" finished=0
+cleanup() {
+  if (( ! finished )) && [[ -n $partial && -e $partial ]]; then
+    rm -f -- $partial
+    print -u2 -r -- "$self: removed incomplete $partial"
+  fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+main() {
+  local -a o_rate=(-r 80M) o_verify o_help
+  zparseopts -D -F -K -- r:=o_rate V=o_verify h=o_help || usage
+  (( $#o_help )) && { sed -n '2,/^$/s/^# \{0,1\}//p' $ZSH_ARGZERO; exit 0 }
+  (( $# == 2 )) || usage
+
+  local rate=$o_rate[-1]
+  [[ -e $2 ]] || die "source not found: $2"
+  [[ -d ${1:h} ]] || die "output directory does not exist: ${1:h}"
+  # Resolve symlinks on both sides so the "inside the source" check is reliable.
+  local src=${2:A} out=${${1:h}:A}/${1:t}
+  local candidate=$out.partial
+
+  [[ -e $out ]] && die "archive already exists: $out"
+  [[ -e $candidate ]] && die "$candidate is left over from a failed run; remove it first"
+  [[ $out == $src/* ]] && die "the archive can't be written inside the source"
+
+  local -a compress=()
+  case $out in
+    *.tar) ;;
+    *.tar.gz|*.tgz)
+      if (( $+commands[pigz] )); then compress=(pigz); else compress=(gzip); fi ;;
+    *.tar.zst|*.tzst)
+      (( $+commands[zstd] )) || die "zstd is not installed"
+      compress=(zstd -q -T0) ;;
+    *) die "unknown archive type (use .tar, .tar.gz, .tgz, .tar.zst or .tzst): $out" ;;
+  esac
+
+  local -a throttle=(cat)
+  if [[ $rate != 0 ]]; then
+    (( $+commands[pv] )) || die "pv is needed for the rate cap (brew/apt/dnf install pv), or pass -r 0"
+    throttle=(pv -L $rate)
+    if [[ -t 2 ]]; then throttle+=(-N ${src:t} -btra); else throttle+=(-q); fi
+  fi
+
+  local -a idle=()
+  if (( $+commands[ionice] )); then
+    idle=(ionice -c 3)
+  elif (( $+commands[taskpolicy] )); then
+    idle=(taskpolicy -b)
+  fi
+
+  local cap=""
+  [[ $rate != 0 ]] && cap=" (read capped at $rate/s)"
+  print -r -- "Archiving $src -> $out$cap"
+  partial=$candidate
+  if (( $#compress )); then
+    $idle tar -C ${src:h} -cf - ${src:t} | $throttle | $compress >| $partial
+  else
+    $idle tar -C ${src:h} -cf - ${src:t} | $throttle >| $partial
+  fi || die "archiving failed"
+
+  # Make sure the data is on disk before calling it done (external drives).
+  if [[ $OSTYPE == linux* ]]; then sync -- $partial; else sync; fi
+
+  if (( $#o_verify )); then
+    print -r -- "Verifying ..."
+    tar -tf $partial >/dev/null || die "verification failed: the archive can't be read back"
+  fi
+
+  mv -- $partial $out || die "cannot rename $partial"
+  finished=1
+  print -r -- "Done: $out ($(du -h -- $out | cut -f1))"
+}
+
+main "$@"

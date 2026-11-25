@@ -30,6 +30,7 @@ A layer directory can contain:
 | Path | What happens |
 |---|---|
 | `functions/<name>` | autoloaded function (file body = function body). Same name in a later layer **replaces** it. `_name` files are completions. |
+| `bin/<name>` | executable put on PATH. Use this instead of a function for long-running jobs, or anything called from scripts, `nohup` or `sudo`. A later layer wins. |
 | `plugins.txt` | [antidote](https://github.com/mattmc3/antidote) bundle lines; all layers are merged into one static bundle, rebuilt only when the list changes |
 | `*.zsh` | sourced in lexical order, after every layer's functions are available |
 
@@ -120,10 +121,20 @@ automatically, because these files run as code in every shell. Turn the notice o
 Typical flow: edit here, commit, push, then `l0th1 push-all` (or let each
 machine show the notice).
 
+## Commands
+
+These live in `zsh/core/bin/` and are on PATH on every machine. Run any of them with `-h` for help.
+
+| Command | Does |
+|---|---|
+| `rm_throttled [-b N] [-s SEC] [-r RATE] [-n] [-y] DIR` | Deletes a huge tree in small batches, at idle I/O priority. Has a dry run and asks for confirmation. Refuses `/`, top-level dirs and `$HOME`. |
+| `tar_throttled [-r RATE] [-V] ARCHIVE SOURCE` | Creates a `.tar`/`.tar.gz`/`.tar.zst` while capping the read rate with `pv`. Writes to `ARCHIVE.partial` and renames it only after the archive is complete and synced to disk. |
+
 ## Testing
 
 ```sh
-test/linux-smoke.sh            # fresh Debian container: server + desktop/dev installs, zsh and vim
+test/linux-smoke.sh            # fresh Debian container: server + desktop/dev installs, zsh, vim, commands
+test/throttled-tools.zsh       # rm_throttled / tar_throttled, on this machine (macOS or Linux)
 ```
 
 ## Layout

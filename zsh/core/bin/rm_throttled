@@ -1,0 +1,106 @@
+#!/usr/bin/env zsh
+# rm_throttled: delete a large directory tree slowly, so other work on the same
+# disk (shared servers, external drives) is not starved of I/O.
+#
+#   rm_throttled [-b BATCH] [-s SECONDS] [-r RATE] [-n] [-y] DIR
+#
+#   -b BATCH    files removed per batch                       (default 100)
+#   -s SECONDS  pause between batches                         (default 0.2)
+#   -r RATE     cap on the indexing scan, as a pv rate of file-name bytes
+#               (default 32k, about 500-800 files/s); 0 = no cap
+#   -n          dry run: index and count, delete nothing
+#   -y          don't ask for confirmation
+#
+# Phases: 1) index every non-directory under DIR (idle I/O priority, rate-capped
+# with pv if installed), 2) delete them in batches, 3) remove the now-empty
+# directories, DIR included. DIR is resolved first (symlinks followed).
+# Refuses /, top-level directories (/data, /home, ...), $HOME and its parents.
+
+emulate -R zsh
+setopt pipe_fail no_unset
+
+self=${ZSH_ARGZERO:t}
+die()  { print -u2 -r -- "$self: $*"; exit 1 }
+warn() { print -u2 -r -- "$self: $*" }
+usage() {
+  print -u2 -r -- "usage: $self [-b batch] [-s seconds] [-r rate] [-n] [-y] DIR"
+  exit 2
+}
+
+# Cleanup runs on every exit path, including die and Ctrl-C.
+list=""
+cleanup() { [[ -n $list ]] && rm -f -- $list }
+trap cleanup EXIT
+trap 'exit 130' INT TERM
+
+main() {
+  local -a o_batch=(-b 100) o_sleep=(-s 0.2) o_rate=(-r 32k) o_dry o_yes o_help
+  zparseopts -D -F -K -- b:=o_batch s:=o_sleep r:=o_rate n=o_dry y=o_yes h=o_help || usage
+  (( $#o_help )) && { sed -n '2,/^$/s/^# \{0,1\}//p' $ZSH_ARGZERO; exit 0 }
+  (( $# == 1 )) || usage
+
+  local batch=$o_batch[-1] delay=$o_sleep[-1] rate=$o_rate[-1]
+  [[ $batch == <1-> ]] || die "batch size must be a positive integer: $batch"
+  [[ $delay == <->(.<->|) ]] || die "pause must be a number of seconds: $delay"
+
+  [[ -d $1 ]] || die "not a directory: $1"
+  local dir=${1:A} home=${HOME:A}
+  if [[ $dir == / || $dir != /*/* || $dir == $home || $home == $dir/* ]]; then
+    die "refusing to delete $dir"
+  fi
+
+  # Lowest I/O and CPU priority available on this OS.
+  local -a idle=()
+  if (( $+commands[ionice] )); then
+    idle=(ionice -c 3)
+  elif (( $+commands[taskpolicy] )); then
+    idle=(taskpolicy -b)
+  fi
+  idle+=(nice -n 19)
+
+  local have_pv=$+commands[pv]
+  list=$(mktemp "${TMPDIR:-/tmp}/rm_throttled.XXXXXX") || die "cannot create a temp file"
+
+  print -r -- "Indexing $dir ..."
+  if [[ $rate != 0 ]] && (( have_pv )); then
+    $idle find $dir -mindepth 1 ! -type d -print0 | pv -q -L $rate >| $list
+  else
+    [[ $rate != 0 ]] && warn "pv not installed: indexing is not rate-capped"
+    $idle find $dir -mindepth 1 ! -type d -print0 >| $list
+  fi || die "indexing failed"
+
+  local total=$(tr -cd '\0' < $list | wc -c)
+  total=${total//[[:space:]]/}
+  print -r -- "Found $total files."
+  (( $#o_dry )) && { print "Dry run: nothing deleted."; return 0 }
+
+  if (( ! $#o_yes )); then
+    [[ -t 0 ]] || die "not a terminal: pass -y to confirm"
+    read -q "?Delete $total files and every directory under $dir? [y/N] " || { print; return 1 }
+    print
+  fi
+
+  local failed=0
+  if (( total > 0 )); then
+    print -r -- "Deleting in batches of $batch, ${delay}s apart ..."
+    local -a rm_batches=(xargs -0 -n $batch sh -c 'd=$1; shift; rm -f -- "$@"; s=$?; sleep "$d"; exit $s' _ $delay)
+    if (( have_pv )) && [[ -t 2 ]]; then
+      pv -0 -l -s $total -N deleted < $list | $idle $rm_batches || failed=1
+    else
+      $idle $rm_batches < $list || failed=1
+    fi
+  fi
+
+  print -r -- "Removing empty directories ..."
+  $idle find $dir -depth -type d -empty -delete || failed=1
+
+  if [[ -e $dir ]]; then
+    local -a left=( ${(f)"$(find $dir -mindepth 1 2>/dev/null | head -5)"} )
+    warn "$dir was not fully removed$( (( failed )) && print ' (some deletions failed)'). For example:"
+    print -u2 -rl -- "  "${^left}
+    return 1
+  fi
+  print -r -- "Done: $dir removed."
+}
+
+main "$@"

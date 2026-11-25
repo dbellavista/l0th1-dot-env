@@ -8,6 +8,7 @@
 #
 # Every layer is an optional directory that may contain:
 #   functions/    one autoloaded function per file. A later layer overrides by name.
+#   bin/          executables put on PATH (usable from scripts, nohup, sudo).
 #   plugins.txt   antidote bundle lines. All layers' files are merged into one bundle.
 #   *.zsh         sourced in lexical order, after every layer's functions are on fpath.
 
@@ -43,8 +44,8 @@ typeset -ga L0TH1_LAYERS L0TH1_PLUGIN_FILES
   L0TH1_LAYERS+=( $L0TH1_CONFIG/local )
   L0TH1_LAYERS=( ${^L0TH1_LAYERS}(N/) )
 
-  # Pass 1: put functions on fpath and collect plugin lists. Each layer is
-  # prepended, so the highest-precedence layer is found first by name.
+  # Pass 1: put functions on fpath, bin/ on PATH and collect plugin lists. Each
+  # layer is prepended, so the highest-precedence layer is found first by name.
   L0TH1_PLUGIN_FILES=()
   for layer in $L0TH1_LAYERS; do
     if [[ -d $layer/functions ]]; then
@@ -53,6 +54,7 @@ typeset -ga L0TH1_LAYERS L0TH1_PLUGIN_FILES
       fns=( ${fns:#_*} )               # _foo files are completions; compinit loads them
       (( $#fns )) && autoload -Uz $fns
     fi
+    [[ -d $layer/bin ]] && path=( $layer/bin $path )
     [[ -r $layer/plugins.txt ]] && L0TH1_PLUGIN_FILES+=( $layer/plugins.txt )
   done
 }

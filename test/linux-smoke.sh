@@ -10,7 +10,7 @@ docker run --rm -i -v "$repo:/src:ro" "$image" bash -s <<'IN'
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq >/dev/null
-apt-get install -y -qq zsh git vim ca-certificates >/dev/null
+apt-get install -y -qq zsh git vim ca-certificates pv zstd >/dev/null
 useradd -m -s /bin/zsh tester
 cp -r /src /home/tester/l0th1-dot-env && chown -R tester: /home/tester/l0th1-dot-env
 su - tester -c 'bash -s' <<'USER'
@@ -40,6 +40,9 @@ else
   cat /tmp/vimdbg; ls ~/.local/share/vim/plugged | tr '\n' ' '; exit 1
 fi
 ~/.local/bin/l0th1 doctor
+echo "=== throttled tools"
+~/l0th1-dot-env/test/throttled-tools.zsh
+zsh -ic 'whence -p rm_throttled tar_throttled' 2>/dev/null | grep -c core/bin | grep -qx 2 && echo "bin/ on PATH ok" || { echo "FAIL: bin/ not on PATH"; exit 1; }
 USER
 IN
 echo "PASS"
