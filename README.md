@@ -128,7 +128,8 @@ The public repo and each overlay can have a `zellij/` folder:
 ```
 zellij/config.kdl          base config (public repo only): settings only, no keybinds dump,
                            so every zellij version uses its own default keybindings
-zellij/themes/<name>.kdl   colour schemes (gothic here; identifai in the identifai overlay)
+zellij/themes/<name>.kdl   colour schemes (gothic here; identifai, identifai-blue in the
+                           identifai overlay; blood in the personal overlay)
 zellij/layouts/<name>.kdl  layouts, started with `zellij --layout <name>`
 zellij/<other>.kdl         any other file, e.g. an extra config used with --config
 ```
