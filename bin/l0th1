@@ -16,7 +16,7 @@ TS=$(date +%Y%m%d-%H%M%S)
 BLOCK_BEGIN='# >>> l0th1-dot-env >>>'
 BLOCK_END='# <<< l0th1-dot-env <<<'
 
-L0TH1_HOST= L0TH1_PROFILES= L0TH1_PRIVATE=
+L0TH1_HOST= L0TH1_PROFILES= L0TH1_OVERLAYS=
 [[ -r $MACHINE ]] && source $MACHINE
 
 QUIET=0
@@ -25,15 +25,47 @@ ok()   { print -P "  %F{green}ok%f   $1" }
 warn() { print -P -u2 "  %F{yellow}warn%f $1" }
 die()  { print -P -u2 "%F{red}error:%f $1"; exit 1 }
 
+overlays() { print -rl -- ${(s.:.)L0TH1_OVERLAYS} }
+
 repos() {
+  local o
   print -r -- $L0TH1_PUBLIC
-  [[ -n $L0TH1_PRIVATE && -d $L0TH1_PRIVATE/.git ]] && print -r -- $L0TH1_PRIVATE
+  for o in $(overlays); do [[ -d $o/.git ]] && print -r -- $o; done
 }
 
 available_profiles() {
+  local o
   local -a dirs=( $L0TH1_PUBLIC/zsh/profiles/*(N/:t) )
-  [[ -n $L0TH1_PRIVATE ]] && dirs+=( $L0TH1_PRIVATE/zsh/profiles/*(N/:t) )
+  for o in $(overlays); do dirs+=( $o/zsh/profiles/*(N/:t) ); done
   print -r -- ${(u)dirs}
+}
+
+# Overlay repos cloned next to the public repo or under ~/.local/share/l0th1.
+# Only used to suggest names: overlays are never enabled automatically.
+detected_overlays() {
+  local -a found=(
+    ${L0TH1_PUBLIC:h}/${L0TH1_PUBLIC:t}-*(N/:t)
+    ${L0TH1_PUBLIC:h}/l0th1-dot-env-*(N/:t)
+    $L0TH1_DATA/*~*/(public|antidote|plugins)(N/:t)
+  )
+  found=( ${found#${L0TH1_PUBLIC:t}-} ); found=( ${found#l0th1-dot-env-} )
+  print -r -- ${(u)found}
+}
+
+# Overlay name (or path) -> absolute repo path in $REPLY. Runs in the current
+# shell (not $(...)) so that die really stops the install.
+resolve_overlay() {
+  local name=$1 c
+  local -a candidates
+  if [[ $name == */* ]]; then
+    candidates=( $name )
+  else
+    candidates=( ${L0TH1_PUBLIC:h}/${L0TH1_PUBLIC:t}-$name ${L0TH1_PUBLIC:h}/l0th1-dot-env-$name $L0TH1_DATA/$name )
+  fi
+  for c in $candidates; do
+    [[ -d $c/zsh || -d $c/vim ]] && { REPLY=${c:A}; return }
+  done
+  die "overlay '$name' not found (looked in: ${candidates[*]})"
 }
 
 # Move a file aside into this run's backup dir.
@@ -56,12 +88,12 @@ write_machine() {
   mkdir -p $L0TH1_CONFIG/local
   local extra=""
   # Keep any hand-added settings (lines that aren't the three managed keys).
-  [[ -r $MACHINE ]] && extra=$(grep -vE '^(#|L0TH1_HOST=|L0TH1_PROFILES=|L0TH1_PRIVATE=)' $MACHINE)
+  [[ -r $MACHINE ]] && extra=$(grep -vE '^(#|L0TH1_HOST=|L0TH1_PROFILES=|L0TH1_PRIVATE=|L0TH1_OVERLAYS=)' $MACHINE)
   {
     print -r -- "# l0th1 machine identity: written by \`l0th1 install\`, safe to edit."
     print -r -- "L0TH1_HOST=${(qq)L0TH1_HOST}"
     print -r -- "L0TH1_PROFILES=${(qq)L0TH1_PROFILES}"
-    print -r -- "L0TH1_PRIVATE=${(qq)L0TH1_PRIVATE}"
+    print -r -- "L0TH1_OVERLAYS=${(qq)L0TH1_OVERLAYS}"
     [[ -n $extra ]] && print -r -- $extra
   } >| $MACHINE
 }
@@ -109,7 +141,7 @@ vim_plugins() {
   local cmd=$1
   (( $+commands[vim] )) || { warn "vim not installed, skipping plugins"; return }
   info "vim: $cmd"
-  export L0TH1_HOST L0TH1_PROFILES L0TH1_PRIVATE
+  export L0TH1_HOST L0TH1_PROFILES L0TH1_OVERLAYS
   vim -N -u $L0TH1_PUBLIC/vim/vimrc -i NONE -es -c "$cmd" -c 'qa!' </dev/null
 }
 
@@ -124,14 +156,14 @@ install_vim() {
 # ---------------------------------------------------------------- commands
 
 cmd_install() {
-  local host=$L0TH1_HOST profiles=$L0TH1_PROFILES private=$L0TH1_PRIVATE c
+  local host=$L0TH1_HOST profiles=$L0TH1_PROFILES overlays_arg= o
   local no_vim=0 profiles_given=0
   INSTALL_PLUGINS=0
   while (( $# )); do
     case $1 in
       --host)       host=$2; shift 2 ;;
       --profiles)   profiles=$2; profiles_given=1; shift 2 ;;
-      --private)    [[ $2 == none ]] && private=NONE || private=${2:A}; shift 2 ;;
+      --overlays)   overlays_arg=$2; shift 2 ;;
       --no-vim)     no_vim=1; shift ;;
       --plugins)    INSTALL_PLUGINS=1; shift ;;
       --quiet)      QUIET=1; shift ;;
@@ -141,16 +173,18 @@ cmd_install() {
   done
 
   [[ -n $host ]] || host=${HOST%%.*}
-  if [[ $private == NONE ]]; then
-    private=
-  elif [[ -z $private ]]; then
-    for c in ${L0TH1_PUBLIC:h}/${L0TH1_PUBLIC:t}-private $L0TH1_DATA/private; do
-      [[ -d $c/.git ]] && { private=${c:A}; break }
-    done
+  if [[ -n $overlays_arg ]]; then
+    local -a resolved=()
+    if [[ $overlays_arg != none ]]; then
+      for o in ${=overlays_arg}; do resolve_overlay $o; resolved+=( $REPLY ); done
+    fi
+    L0TH1_OVERLAYS=${(j.:.)resolved}
+  elif [[ ! -r $MACHINE ]]; then
+    local found=$(detected_overlays)
+    [[ -n $found ]] && warn "overlays found on disk but not enabled: $found. Use --overlays \"...\"."
   fi
-  [[ -z $private || -d $private/zsh ]] || die "$private is not an l0th1 private repo (no zsh/ dir)"
 
-  L0TH1_HOST=$host L0TH1_PROFILES=$profiles L0TH1_PRIVATE=$private
+  L0TH1_HOST=$host L0TH1_PROFILES=$profiles
 
   local p known=" $(available_profiles) "
   for p in ${=L0TH1_PROFILES}; do
@@ -166,7 +200,8 @@ cmd_install() {
   install_zshrc
   (( no_vim )) || install_vim
 
-  info "host=%B$L0TH1_HOST%b profiles=%B${L0TH1_PROFILES:-<none>}%b private=%B${L0TH1_PRIVATE:-<none>}%b"
+  local names=( $(overlays) ); names=( ${${names:t}#${L0TH1_PUBLIC:t}-} ); names=( ${names#l0th1-dot-env-} )
+  info "host=%B$L0TH1_HOST%b profiles=%B${L0TH1_PROFILES:-<none>}%b overlays=%B${names[*]:-<none>}%b"
   info "done. Open a new shell (first start downloads zsh plugins)."
 }
 
@@ -226,11 +261,11 @@ cmd_doctor() {
   [[ -L $v && ${v:A} == ${want:A} ]] && ok "~/.vim -> repo" || warn "~/.vim is not linked to $L0TH1_PUBLIC/vim"
   [[ -e $HOME/.vimrc ]] && warn "~/.vimrc exists and shadows ~/.vim/vimrc"
   [[ -r $L0TH1_DATA/antidote/antidote.zsh ]] && ok "antidote installed" || warn "antidote missing (installed on next shell start)"
-  if [[ -n $L0TH1_PRIVATE ]]; then
-    [[ -d $L0TH1_PRIVATE/zsh ]] && ok "private repo $L0TH1_PRIVATE" || { warn "private repo $L0TH1_PRIVATE missing"; problems=1 }
-  else
-    ok "no private repo (public only)"
-  fi
+  local o
+  for o in $(overlays); do
+    [[ -d $o ]] && ok "overlay $o" || { warn "overlay $o missing"; problems=1 }
+  done
+  [[ -z $L0TH1_OVERLAYS ]] && ok "no overlays (public only)"
   [[ -d $L0TH1_CONFIG/local ]] && ok "local overrides dir $L0TH1_CONFIG/local"
   local t
   for t in git zsh vim; do (( $+commands[$t] )) && ok "$t found" || { warn "$t not found"; problems=1 }; done
@@ -253,8 +288,10 @@ cmd_push_all() {
     esac
     shift
   done
-  local list=${L0TH1_PRIVATE:-/nonexistent}/machines.txt
-  [[ -r $list ]] || die "no machines.txt in the private repo"
+  # Each overlay lists its own machines, so this machine only knows the hosts
+  # of the overlays it has.
+  local -a lists=( ${^${(f)"$(overlays)"}}/machines.txt(N.) )
+  (( $#lists )) || die "no machines.txt in any overlay"
 
   # Remote machines pull from the git remote, so local commits must be pushed first.
   local r
@@ -265,10 +302,12 @@ cmd_push_all() {
     fi
   done
 
-  local line target name failed=()
-  for line in "${(@f)$(grep -vE '^[[:space:]]*(#|$)' $list)}"; do
+  local line target name failed=() seen=()
+  for line in "${(@f)$(cat $lists | grep -vE '^[[:space:]]*(#|$)')}"; do
     target=${${=line}[1]} name=${${=line}[2]:-$target}
-    [[ $name == $L0TH1_HOST ]] && continue
+    [[ -n $target ]] || continue
+    [[ $name == $L0TH1_HOST || ${seen[(Ie)$name]} -gt 0 ]] && continue
+    seen+=( $name )
     info "$target"
     (( dry )) && { print "  would run: ssh $fwd $target '~/.local/bin/l0th1 update'"; continue }
     ssh $fwd -o BatchMode=yes -o ConnectTimeout=5 $target '~/.local/bin/l0th1 update' 2>&1 \
@@ -282,16 +321,16 @@ usage() {
   cat <<EOF
 l0th1: manage l0th1-dot-env on this machine
 
-  l0th1 install [--host NAME] [--profiles "p1 p2"] [--private DIR|none] [--no-vim] [--plugins]
+  l0th1 install [--host NAME] [--profiles "p1 p2"] [--overlays "o1 o2"|none] [--no-vim] [--plugins]
       Write ~/.config/l0th1/machine.zsh, the ~/.zshrc block and the ~/.vim link.
       Safe to re-run; anything it replaces is moved to $L0TH1_STATE/backups/.
-  l0th1 update [--plugins]     git pull both repos (fast-forward only), refresh links;
+  l0th1 update [--plugins]     git pull all repos (fast-forward only), refresh links;
                               --plugins also updates zsh and vim plugins
   l0th1 status                 machine identity and repo state
   l0th1 doctor                 check the installation
   l0th1 check                  fetch and count upstream commits (the shell runs this daily)
   l0th1 push-all [--dry-run] [--forward-agent]
-                              run 'l0th1 update' on every host in the private machines.txt
+                              run 'l0th1 update' on every host in the overlays' machines.txt
 
 Profiles available here: $(available_profiles)
 EOF

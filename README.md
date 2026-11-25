@@ -4,7 +4,11 @@ My zsh and vim setup, deployed to every machine I use: laptops, desktops,
 servers, and (vim only) Windows.
 
 - **This repo (public):** the base config, general functions, OS and profile layers, and the `l0th1` tool.
-- **`l0th1-dot-env-private` (private, optional):** work functions, per-host overrides, and the machine list.
+- **Overlays (private, optional):** one repo per trust domain. Each machine clones only the ones it should have:
+  - `l0th1-dot-env-personal`: personal machines
+  - `l0th1-dot-env-identifai`: IdentifAI machines (work laptop, work servers)
+
+  An overlay that isn't cloned on a machine has none of its code on that machine's disk.
 - **Each machine (in no repo):** its identity in `~/.config/l0th1/machine.zsh`, and secrets or one-off tweaks in `~/.config/l0th1/local/`.
 
 ## Layers
@@ -15,9 +19,9 @@ Config is built from layers. Each one is an optional directory, and later layers
 public   zsh/core
 public   zsh/os/<darwin|linux>
 public   zsh/profiles/<profile>          for each profile in L0TH1_PROFILES
-private  zsh/common
-private  zsh/profiles/<profile>
-private  zsh/hosts/<L0TH1_HOST>
+overlay  zsh/common                     \
+overlay  zsh/profiles/<profile>          > for each overlay in L0TH1_OVERLAYS, in order
+overlay  zsh/hosts/<L0TH1_HOST>          /
 machine  ~/.config/l0th1/local
 ```
 
@@ -30,7 +34,7 @@ A layer directory can contain:
 | `*.zsh` | sourced in lexical order, after every layer's functions are available |
 
 Vim follows the same idea: `vim/core/*.vim`, then
-`<private>/vim/{common,profiles/<p>,hosts/<host>}/*.vim` (each may also have a
+`<overlay>/vim/{common,profiles/<p>,hosts/<host>}/*.vim` (each may also have a
 `plugins.vim` with extra `Plug` lines), then `~/.vimrc.local`.
 
 ### Profiles
@@ -40,9 +44,12 @@ Vim follows the same idea: `vim/core/*.vim`, then
 | `desktop` | personal workstations | gpg-agent as SSH agent (not inside SSH sessions), autojump, vscode |
 | `dev` | anywhere I write code | python/pip/rust/... OMZ plugins, `i`/`itest`/`gfpush`; vim YouCompleteMe, ALE, jsdoc (these need build tools) |
 | `server` | headless boxes | base only |
-| `work`, `android` | *(private repo)* | AWS/jump-host helpers, scrcpy/adb helpers |
+| `android` | *(identifai overlay)* | scrcpy/adb helpers |
 
-A profile name works if a directory exists for it in either repo.
+Overlays can also add to existing profiles. For example, the identifai overlay's
+`profiles/desktop` adds the AWS/jump-host helpers, but only on machines that have that overlay.
+
+A profile name works if a directory exists for it in the public repo or any enabled overlay.
 
 ## Install
 
@@ -50,10 +57,11 @@ New machine (zsh and git required):
 
 ```sh
 git clone https://github.com/dbellavista/l0th1-dot-env.git ~/.local/share/l0th1/public
-# optional, on machines with access to it:
-git clone git@github.com:dbellavista/l0th1-dot-env-private.git ~/.local/share/l0th1/private
+# overlays: only the ones this machine should have
+git clone git@github.com:dbellavista/l0th1-dot-env-personal.git  ~/.local/share/l0th1/personal
+git clone git@github.com:dbellavista/l0th1-dot-env-identifai.git ~/.local/share/l0th1/identifai
 
-~/.local/share/l0th1/public/bin/l0th1 install --host <name> --profiles "desktop dev"
+~/.local/share/l0th1/public/bin/l0th1 install --host <name> --profiles "desktop dev" --overlays "personal"
 ```
 
 `install`:
@@ -65,9 +73,22 @@ git clone git@github.com:dbellavista/l0th1-dot-env-private.git ~/.local/share/l0
 
 Anything it replaces is moved to `~/.local/state/l0th1/backups/<timestamp>/`. Running it again is safe.
 
-The private repo is found automatically next to the public one
-(`../l0th1-dot-env-private`) or at `~/.local/share/l0th1/private`. Pass
-`--private DIR` or `--private none` to override.
+`--overlays` takes names or paths. A name is looked up next to the public repo
+(`../<public-dir>-<name>`, `../l0th1-dot-env-<name>`) and in
+`~/.local/share/l0th1/<name>`. Overlays are **never enabled automatically**.
+Install only lists the ones it finds on disk, so cloning a repo by mistake doesn't
+load its code. `--overlays none` disables all of them.
+
+Typical machines:
+
+| Machine | `--overlays` |
+|---|---|
+| personal desktop / Mac mini | `personal` |
+| IdentifAI laptop | `identifai` (plus `personal` if you want it there) |
+| work servers | `identifai` |
+
+Keep access separate as well: personal machines should have no key or token that
+can read the identifai repo. Use per-machine deploy keys or a separate SSH key.
 
 ### Windows (vim only)
 
@@ -87,7 +108,7 @@ the `source` line. Machine-only settings go in `~/_vimrc.local`.
 |---|---|
 | `l0th1 update` | `git pull --ff-only` both repos, refresh the `~/.zshrc` block and links |
 | `l0th1 update --plugins` | also `antidote update` and `:PlugUpdate` |
-| `l0th1 push-all` | runs `l0th1 update` over SSH on every host in the private `machines.txt` (`--dry-run`, `--forward-agent`) |
+| `l0th1 push-all` | runs `l0th1 update` over SSH on every host listed in the enabled overlays' `machines.txt` (`--dry-run`, `--forward-agent`) |
 | `l0th1 status` / `l0th1 doctor` | machine identity and repo state / installation checks |
 
 Shells notice upstream changes by themselves: a background `git fetch` runs at

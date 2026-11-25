@@ -4,12 +4,13 @@
 "
 " Load order (later overrides earlier):
 "   core/*.vim                       shared settings (this repo)
-"   <private>/vim/{common,profiles/<p>,hosts/<host>}/*.vim
+"   <overlay>/vim/{common,profiles/<p>,hosts/<host>}/*.vim   for each overlay repo
 "   ~/.vimrc.local  (~/_vimrc.local on Windows)   machine-only, not in git
 "
-" Plugins: core/plugins.vim; private layers can add Plug lines in plugins.vim.
-" Machine identity comes from $L0TH1_PROFILES / $L0TH1_HOST / $L0TH1_PRIVATE (set by
-" the zsh setup), or from g:l0th1_* set before sourcing this file (Windows).
+" Plugins: core/plugins.vim; overlay layers can add Plug lines in plugins.vim.
+" Machine identity comes from $L0TH1_PROFILES / $L0TH1_HOST / $L0TH1_OVERLAYS (set by
+" the zsh setup), or from g:l0th1_* set before sourcing this file (Windows:
+" g:l0th1_overlays must be a list, since ':' appears in drive letters).
 
 " Skip initialization for vim-tiny or vim-small.
 if !1 | finish | endif
@@ -18,7 +19,7 @@ set nocompatible
 let g:l0th1_vim = expand('<sfile>:p:h')
 let g:l0th1_profiles = get(g:, 'l0th1_profiles', split($L0TH1_PROFILES))
 let g:l0th1_host = get(g:, 'l0th1_host', empty($L0TH1_HOST) ? hostname() : $L0TH1_HOST)
-let g:l0th1_private = get(g:, 'l0th1_private', $L0TH1_PRIVATE)
+let g:l0th1_overlays = get(g:, 'l0th1_overlays', split($L0TH1_OVERLAYS, ':'))
 
 " Plugins and undo history live outside the repo.
 if has('win32')
@@ -39,15 +40,15 @@ function! L0th1HasProfile(name) abort
   return index(g:l0th1_profiles, a:name) >= 0
 endfunction
 
-" Private layer directories, lowest to highest precedence.
-function! L0th1PrivateDirs() abort
-  if empty(g:l0th1_private) || !isdirectory(g:l0th1_private . '/vim')
-    return []
-  endif
-  let l:base = g:l0th1_private . '/vim/'
-  let l:dirs = [l:base . 'common']
-  call extend(l:dirs, map(copy(g:l0th1_profiles), 'l:base . "profiles/" . v:val'))
-  call add(l:dirs, l:base . 'hosts/' . g:l0th1_host)
+" Overlay layer directories, lowest to highest precedence.
+function! L0th1OverlayDirs() abort
+  let l:dirs = []
+  for l:overlay in g:l0th1_overlays
+    let l:base = l:overlay . '/vim/'
+    call add(l:dirs, l:base . 'common')
+    call extend(l:dirs, map(copy(g:l0th1_profiles), 'l:base . "profiles/" . v:val'))
+    call add(l:dirs, l:base . 'hosts/' . g:l0th1_host)
+  endfor
   return filter(l:dirs, 'isdirectory(v:val)')
 endfunction
 
@@ -55,7 +56,7 @@ for s:name in ['options', 'plugins', 'ui', 'editing', 'filetypes', 'commands']
   execute 'source' fnameescape(g:l0th1_vim . '/core/' . s:name . '.vim')
 endfor
 
-for s:dir in L0th1PrivateDirs()
+for s:dir in L0th1OverlayDirs()
   for s:file in sort(glob(s:dir . '/*.vim', 0, 1))
     if fnamemodify(s:file, ':t') !=# 'plugins.vim'
       execute 'source' fnameescape(s:file)

@@ -2,7 +2,8 @@
 #
 # Layers load from lowest to highest precedence:
 #   public   zsh/core -> zsh/os/<os> -> zsh/profiles/<profile>...
-#   private  zsh/common -> zsh/profiles/<profile>... -> zsh/hosts/<host>
+#   overlay  zsh/common -> zsh/profiles/<profile>... -> zsh/hosts/<host>
+#            for each private overlay repo in L0TH1_OVERLAYS, in order
 #   machine  ~/.config/l0th1/local            (unmanaged: secrets, one-off tweaks)
 #
 # Every layer is an optional directory that may contain:
@@ -16,7 +17,7 @@
 L0TH1_PUBLIC=${${(%):-%x}:A:h:h}
 : ${L0TH1_HOST:=${HOST%%.*}}
 : ${L0TH1_PROFILES:=}
-: ${L0TH1_PRIVATE:=}
+: ${L0TH1_OVERLAYS:=}    # colon-separated overlay repo paths, e.g. personal and identifai
 : ${L0TH1_DATA:=${XDG_DATA_HOME:-$HOME/.local/share}/l0th1}
 : ${L0TH1_CACHE:=${XDG_CACHE_HOME:-$HOME/.cache}/l0th1}
 : ${L0TH1_STATE:=${XDG_STATE_HOME:-$HOME/.local/state}/l0th1}
@@ -26,19 +27,19 @@ case $OSTYPE in
   *)       L0TH1_OS=other ;;
 esac
 # Exported so vim (and child shells) see the same machine identity.
-export L0TH1_CONFIG L0TH1_PUBLIC L0TH1_PRIVATE L0TH1_HOST L0TH1_PROFILES L0TH1_OS
+export L0TH1_CONFIG L0TH1_PUBLIC L0TH1_OVERLAYS L0TH1_HOST L0TH1_PROFILES L0TH1_OS
 
 typeset -ga L0TH1_LAYERS L0TH1_PLUGIN_FILES
 () {
-  local p layer
+  local p layer overlay
   local -a fns
   L0TH1_LAYERS=( $L0TH1_PUBLIC/zsh/core $L0TH1_PUBLIC/zsh/os/$L0TH1_OS )
   for p in ${=L0TH1_PROFILES}; do L0TH1_LAYERS+=( $L0TH1_PUBLIC/zsh/profiles/$p ); done
-  if [[ -n $L0TH1_PRIVATE && -d $L0TH1_PRIVATE/zsh ]]; then
-    L0TH1_LAYERS+=( $L0TH1_PRIVATE/zsh/common )
-    for p in ${=L0TH1_PROFILES}; do L0TH1_LAYERS+=( $L0TH1_PRIVATE/zsh/profiles/$p ); done
-    L0TH1_LAYERS+=( $L0TH1_PRIVATE/zsh/hosts/$L0TH1_HOST )
-  fi
+  for overlay in ${(s.:.)L0TH1_OVERLAYS}; do
+    L0TH1_LAYERS+=( $overlay/zsh/common )
+    for p in ${=L0TH1_PROFILES}; do L0TH1_LAYERS+=( $overlay/zsh/profiles/$p ); done
+    L0TH1_LAYERS+=( $overlay/zsh/hosts/$L0TH1_HOST )
+  done
   L0TH1_LAYERS+=( $L0TH1_CONFIG/local )
   L0TH1_LAYERS=( ${^L0TH1_LAYERS}(N/) )
 

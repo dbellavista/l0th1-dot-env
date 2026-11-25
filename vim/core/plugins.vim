@@ -56,8 +56,8 @@ if L0th1HasProfile('dev')
     \ }
 endif
 
-" Private layers may add their own Plug lines.
-for s:dir in L0th1PrivateDirs()
+" Overlay layers may add their own Plug lines.
+for s:dir in L0th1OverlayDirs()
   if filereadable(s:dir . '/plugins.vim')
     execute 'source' fnameescape(s:dir . '/plugins.vim')
   endif

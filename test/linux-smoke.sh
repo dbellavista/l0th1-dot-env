@@ -18,7 +18,7 @@ set -euo pipefail
 cd ~
 for profiles in "server" "desktop dev"; do
   echo "=== profiles: $profiles"
-  ~/l0th1-dot-env/bin/l0th1 install --host testbox --profiles "$profiles" --private none --no-vim
+  ~/l0th1-dot-env/bin/l0th1 install --host testbox --profiles "$profiles" --overlays none --no-vim
   zsh -ic 'exit' >/dev/null 2>&1                   # first start: clones antidote + plugins
   out=$(zsh -ic 'whence -w pathadd gfpush l0th1; print -r -- "theme=$ZSH_THEME"' 2>&1)
   echo "$out"
