@@ -1,5 +1,0 @@
-# %FFILE%
-
-Author: %AUTHOR%
-
-%HERE%

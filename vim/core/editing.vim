@@ -11,8 +11,6 @@ map <C-ScrollWheelDown> <nop>
 
 " Section: Search {{{
 nnoremap <F3> :set hlsearch!<CR>
-map <F4> :call ToggleHighlight(1)<CR>
-nnoremap <space>/ :Unite grep:.<cr>
 " }}}
 
 " Section: IDE Like {{{
@@ -22,12 +20,8 @@ map <LocalLeader>t :NERDTreeToggle<CR>
 " }}}
 
 " Section: Formatting {{{
-nnoremap <C-Q> :call DoFormat()<CR>
-nmap <F1> mz:call TabToggle()<CR>'z
+nnoremap <C-Q> :ALEFix<CR>
 imap <S-Tab> <Esc><<i
-nnoremap <leader>l :TagbarToggle<CR>
-let g:tagbar_usearrows = 1
-nmap <silent> <C-l> <Plug>(jsdoc)
 map <F10> :echo "hi<" . synIDattr(synID(line("."),col("."),1),"name") . '> trans<'
 \ . synIDattr(synID(line("."),col("."),0),"name") . "> lo<"
 \ . synIDattr(synIDtrans(synID(line("."),col("."),1)),"name") . ">"<CR>

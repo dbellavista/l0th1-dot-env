@@ -23,42 +23,20 @@ endfunction
 call plug#begin(g:l0th1_vim_data . '/plugged')
 
 " Base: no build step.
-Plug 'aperezdc/vim-template'
 Plug 'ctrlpvim/ctrlp.vim'
-Plug 'saltstack/salt-vim'
 Plug 'bling/vim-airline'
-Plug 'pangloss/vim-javascript'
-Plug 'elzr/vim-json'
-Plug 'dag/vim-fish'
-Plug 'leafgarland/typescript-vim'
-Plug 'tyrannicaltoucan/vim-quantum'
-Plug 'derekwyatt/vim-scala'
 Plug 'scrooloose/nerdtree'
-Plug 'vim-scripts/SyntaxRange'
 Plug 'tpope/vim-unimpaired'
-Plug 'Matt-Deacalion/vim-systemd-syntax'
-Plug 'briancollins/vim-jst'
-Plug 'tmhedberg/SimpylFold'
-Plug 'PProvost/vim-ps1'
 Plug 'lambdalisue/suda.vim'
 Plug 'godlygeek/tabular'
-Plug 'rust-lang/rust.vim'
 Plug 'plasticboy/vim-markdown'
-Plug 'Glench/Vim-Jinja2-Syntax'
-Plug 'tidalcycles/vim-tidal'
 " Themes
-Plug 'tlhr/anderson.vim'
 Plug 'sainnhe/edge'
-Plug 'altercation/vim-colors-solarized'
 Plug 'vim-airline/vim-airline-themes'
 
 if L0th1HasProfile('dev')
   Plug 'Valloric/YouCompleteMe', { 'do': function('BuildYCM') }
   Plug 'w0rp/ale', { 'do': function('BuildALE') }
-  Plug 'heavenshell/vim-jsdoc', {
-    \ 'for': ['javascript', 'javascript.jsx', 'typescript'],
-    \ 'do': 'make install'
-    \ }
 endif
 
 " Overlay layers may add their own Plug lines.
@@ -81,7 +59,6 @@ let g:ale_linters = {
 let g:ale_fixers = {
  \ 'javascript': ['prettier_eslint'],
  \ 'markdown': ['prettier', 'remark-lint'],
- \ 'xml': ['xmllint', 'prettier'],
  \ 'go': ['gofmt'],
  \ 'json': ['prettier'],
  \ 'typescript': ['prettier', 'tslint'],
@@ -108,19 +85,7 @@ let g:ctrlp_custom_ignore = {
       \ 'link': 'some_bad_symbolic_links'
       \ }
 
-let g:ycm_extra_conf_globlist = ['~/Documents/BlackMagic/*', '~/Documents/Personal/Projects/challenges/*', '!/*']
 let g:ycm_always_populate_location_list = 1
 
-let g:javascript_plugin_jsdoc = 1
-let g:jsdoc_underscore_private = 1
-let g:jsdoc_access_descriptions = 2
-let g:jsdoc_enable_es6 = 1
-let g:jsdoc_tags = {} | let g:jsdoc_tags['extends'] = 'augments'
 
-let g:templates_no_autocmd = 0
-let g:templates_directory = g:l0th1_vim . '/templates'
-let g:templates_user_variables = [['AUTHOR', 'GetAuthor']]
-function! GetAuthor()
-  return 'Daniele Bellavista'
-endfunction
 " }}}

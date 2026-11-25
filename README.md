@@ -176,6 +176,6 @@ zsh/os/<darwin|linux>/   OS-specific PATH, Homebrew, aliases
 zsh/profiles/            desktop/, dev/, server/
 vim/vimrc                entrypoint
 vim/core/                options, plugins, ui, editing, filetypes, commands
-vim/{autoload,colors,keymap,templates}/
+vim/{autoload,colors,keymap}/
 zellij/                  base config, themes, layouts (see Zellij)
 ```
