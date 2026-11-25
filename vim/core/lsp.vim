@@ -40,7 +40,7 @@ function! s:Mappings() abort
   nnoremap <buffer> <silent> K <Cmd>LspHover<CR>
   nnoremap <buffer> <silent> [d <Cmd>LspDiag prevWrap<CR>
   nnoremap <buffer> <silent> ]d <Cmd>LspDiag nextWrap<CR>
-  nnoremap <buffer> <silent> <leader>d <Cmd>LspDiag show<CR>
+  nnoremap <buffer> <silent> <space>e <Cmd>LspDiag show<CR>
   nnoremap <buffer> <silent> <leader>rn <Cmd>LspRename<CR>
   nnoremap <buffer> <silent> <leader>ca <Cmd>LspCodeAction<CR>
   nnoremap <buffer> <silent> <leader>s <Cmd>LspDocumentSymbol<CR>

@@ -42,3 +42,37 @@ if has('gui_running')
   set guioptions-=R
   set guioptions-=L
 endif
+
+" Statusline (replaces airline): mode, git branch, file, flags, keymap,
+" LSP diagnostic counts, filetype, position.
+let s:modes = {'n': 'NORMAL', 'i': 'INSERT', 'R': 'REPLACE', 'v': 'VISUAL',
+      \ 'V': 'V-LINE', "\<C-v>": 'V-BLOCK', 'c': 'COMMAND', 't': 'TERMINAL',
+      \ 's': 'SELECT', 'S': 'S-LINE', "\<C-s>": 'S-BLOCK'}
+
+function! L0th1Mode() abort
+  return get(s:modes, mode(), mode())
+endfunction
+
+function! L0th1Branch() abort
+  let l:head = exists('*FugitiveHead') ? FugitiveHead(7) : ''
+  return empty(l:head) ? '' : ' ' . l:head . ' '
+endfunction
+
+function! L0th1Diags() abort
+  if !get(g:, 'loaded_lsp', 0)
+    return ''
+  endif
+  let l:c = lsp#lsp#ErrorCount()
+  let l:out = []
+  if l:c.Error | call add(l:out, 'E' . l:c.Error) | endif
+  if l:c.Warn | call add(l:out, 'W' . l:c.Warn) | endif
+  return empty(l:out) ? '' : ' ' . join(l:out) . ' '
+endfunction
+
+set noshowmode
+set statusline=%#PmenuSel#\ %{L0th1Mode()}\ %*
+set statusline+=%#StatusLineNC#%{L0th1Branch()}%*
+set statusline+=\ %f%(\ %h%m%r%)%(\ %k%)
+set statusline+=%=
+set statusline+=%#ErrorMsg#%{L0th1Diags()}%*
+set statusline+=\ %{&filetype}\ \ %l:%c\ \ %P\ 

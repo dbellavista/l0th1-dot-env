@@ -11,14 +11,14 @@ endfor
 call plug#begin(g:l0th1_vim_data . '/plugged')
 
 " Base: no build step.
-Plug 'ctrlpvim/ctrlp.vim'
-Plug 'bling/vim-airline'
-Plug 'scrooloose/nerdtree'
+" fzf.vim needs the fzf binary: fzf#install() downloads one if it is not on PATH.
+Plug 'junegunn/fzf', { 'do': { -> fzf#install() } }
+Plug 'junegunn/fzf.vim'
+Plug 'tpope/vim-fugitive'
+Plug 'mhinz/vim-signify'
 Plug 'tpope/vim-unimpaired'
 Plug 'lambdalisue/suda.vim'
-" Themes
 Plug 'sainnhe/edge'
-Plug 'vim-airline/vim-airline-themes'
 
 if L0th1HasProfile('dev')
   " LSP client in Vim9script: completion, hover, goto, rename, diagnostics, format.
@@ -35,19 +35,18 @@ endfor
 call plug#end()
 
 " Section: Plugin settings {{{
-let g:airline_powerline_fonts = 1
-let g:airline#extensions#keymap#enabled = 0
+" fzf: popup window; :Files lists what ripgrep would search (respects .gitignore).
+let g:fzf_layout = { 'window': { 'width': 0.9, 'height': 0.8 } }
+if executable('rg')
+  let $FZF_DEFAULT_COMMAND = 'rg --files --hidden --glob "!.git/"'
+endif
 
-let g:NERDTreeDirArrowExpandable = '▸'
-let g:NERDTreeDirArrowCollapsible = '▾'
+" signify: git only, sign column always shown so text doesn't shift.
+let g:signify_vcs_list = ['git']
+set signcolumn=yes
 
-let g:ctrlp_working_path_mode = 'ra'
-let g:ctrlp_custom_ignore = {
-      \ 'dir':  '\v[\/](\.git|\.hg|\.svn|\.tmp|tmp|dist|releases|node_modules|build|__?tmp|libs|coverage|doc\/out|dock\/gen|vendor|doc\/jsod)$',
-      \ 'file': '\v\.(exe|so|dll|gif|png)$',
-      \ 'link': 'some_bad_symbolic_links'
-      \ }
-
-
-
+" netrw: tree listing, no banner.
+let g:netrw_banner = 0
+let g:netrw_liststyle = 3
+let g:netrw_winsize = 25
 " }}}

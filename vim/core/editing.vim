@@ -9,14 +9,39 @@ map <S-ScrollWheelDown> <nop>
 map <C-ScrollWheelDown> <nop>
 " }}}
 
-" Section: Search {{{
+" Section: Search and navigation {{{
 nnoremap <F3> :set hlsearch!<CR>
+nnoremap <space>f <Cmd>Files<CR>
+nnoremap <space>/ <Cmd>Rg<CR>
+nnoremap <space>* <Cmd>execute 'Rg ' . expand('<cword>')<CR>
+nnoremap <space>b <Cmd>Buffers<CR>
+nnoremap <space>h <Cmd>History<CR>
+" Files changed in the working tree (what an agent just touched).
+nnoremap <space>g <Cmd>GFiles?<CR>
+nnoremap <LocalLeader>t <Cmd>Lexplore<CR>
 " }}}
 
-" Section: IDE Like {{{
-autocmd StdinReadPre * let s:std_in=1
-autocmd VimEnter * if argc() == 1 && isdirectory(argv()[0]) && !exists("s:std_in") && exists(':NERDTree') | exe 'NERDTree' argv()[0] | wincmd p | ene | endif
-map <LocalLeader>t :NERDTreeToggle<CR>
+" Section: Git review {{{
+nnoremap <space>d <Cmd>Gdiffsplit<CR>
+nnoremap <space>s <Cmd>Git<CR>
+" ]c / [c jump between changed hunks (signify, and in diff mode).
+nnoremap <space>u <Cmd>SignifyHunkUndo<CR>
+nnoremap <space>p <Cmd>SignifyHunkDiff<CR>
+" }}}
+
+" Section: Agent handoff {{{
+" Copy a reference to the cursor line or the selected lines (path:12 or
+" path:12-30, relative to the cwd) to paste into an agent prompt.
+function! s:CopyRef(first, last) abort
+  let l:ref = expand('%:.') . ':' . a:first . (a:last > a:first ? '-' . a:last : '')
+  call setreg('"', l:ref)
+  if has('clipboard')
+    call setreg('+', l:ref)
+  endif
+  echo 'copied ' . l:ref
+endfunction
+nnoremap <space>r <Cmd>call <SID>CopyRef(line('.'), line('.'))<CR>
+xnoremap <space>r <Esc><Cmd>call <SID>CopyRef(line("'<"), line("'>"))<CR>
 " }}}
 
 " Section: Formatting {{{
