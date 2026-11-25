@@ -1,2 +1,2 @@
-# Personal workstations (laptop, desktop, mini).
+# Workstations (laptop, desktop, mini). autojump loads from core/60-autojump.zsh.
 ohmyzsh/ohmyzsh path:plugins/vscode

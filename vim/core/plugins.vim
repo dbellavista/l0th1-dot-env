@@ -2,9 +2,14 @@
 " Base plugins load everywhere. Plugins with a build step need the `dev` profile.
 " Install/update: `l0th1 install --plugins` / `l0th1 update --plugins`, or :PlugInstall.
 
+" Build YouCompleteMe with the completers this machine has the tools for.
 function! BuildYCM(info)
   if a:info.status == 'installed' || a:info.force
-    !./install.py --ts-completer --omnisharp-completer --clang-completer --gocode-completer
+    let l:flags = ['--clang-completer']
+    if executable('npm') | call add(l:flags, '--ts-completer') | endif
+    if executable('go') | call add(l:flags, '--go-completer') | endif
+    if L0th1HasProfile('desktop') | call add(l:flags, '--omnisharp-completer') | endif
+    execute '!./install.py ' . join(l:flags)
   endif
 endfunction
 

@@ -28,14 +28,16 @@ for profiles in "server" "desktop dev"; do
     echo "FAIL: unexpected output"; exit 1
   fi
 done
-~/.local/bin/l0th1 install --plugins >/dev/null      # vim link + plugin install
+~/.local/bin/l0th1 install --vim --plugins >/dev/null   # vim link + plugin install (--no-vim was remembered)
 again=$(~/.local/bin/l0th1 install 2>&1)
 if grep -qE 'refreshed|backed up|wrote' <<<"$again"; then echo "FAIL: re-install not idempotent: $again"; exit 1; fi
 echo "re-install idempotent"
 if vim -N -u ~/.vim/vimrc -i NONE -es -c 'if !exists("g:plugs") || g:colors_name !=# "edge" | cquit | endif' -c 'qa!' </dev/null; then
   echo "vim ok"
 else
-  echo "FAIL: vim config did not load"; exit 1
+  echo "FAIL: vim config did not load"
+  vim -N -u ~/.vim/vimrc -i NONE -es -c 'redir! > /tmp/vimdbg' -c 'echo "plugs=" . exists("g:plugs") . " colors=" . get(g:, "colors_name", "NONE")' -c messages -c 'redir END' -c 'qa!' </dev/null
+  cat /tmp/vimdbg; ls ~/.local/share/vim/plugged | tr '\n' ' '; exit 1
 fi
 ~/.local/bin/l0th1 doctor
 USER
