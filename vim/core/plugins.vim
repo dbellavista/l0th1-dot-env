@@ -20,6 +20,12 @@ function! BuildALE(info)
   endif
 endfunction
 
+" Packages bundled with Vim 9.1+: gc comments, .editorconfig, % on keywords,
+" yank flash, :HelpToc (also for markdown headings).
+for s:pack in ['comment', 'editorconfig', 'matchit', 'hlyank', 'helptoc']
+  silent! execute 'packadd!' s:pack
+endfor
+
 call plug#begin(g:l0th1_vim_data . '/plugged')
 
 " Base: no build step.
@@ -28,8 +34,6 @@ Plug 'bling/vim-airline'
 Plug 'scrooloose/nerdtree'
 Plug 'tpope/vim-unimpaired'
 Plug 'lambdalisue/suda.vim'
-Plug 'godlygeek/tabular'
-Plug 'plasticboy/vim-markdown'
 " Themes
 Plug 'sainnhe/edge'
 Plug 'vim-airline/vim-airline-themes'

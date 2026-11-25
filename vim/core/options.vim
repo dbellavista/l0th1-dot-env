@@ -11,12 +11,36 @@ if !isdirectory(&undodir)
   call mkdir(&undodir, 'p')
 endif
 set undofile
-autocmd BufRead,BufNewFile /mnt/* set undodir=.
+" Swap and write-backup files stay out of the project, where agents and
+" `git status` would see them.
+let &directory = g:l0th1_vim_state . '/swap//'
+let &backupdir = g:l0th1_vim_state . '/backup//'
+for s:dir in [&directory, &backupdir]
+  if !isdirectory(s:dir)
+    call mkdir(s:dir, 'p')
+  endif
+endfor
 " }}}
 
 " Section: Vim buffers {{{
 set hidden
+" Files change under us when agents edit them: reload unmodified buffers on
+" focus/buffer switch, when idle, and every 2s while sitting in normal mode
+" (covers the case where vim never loses focus, e.g. another zellij pane).
 set autoread
+set updatetime=300
+augroup l0th1_checktime
+  autocmd!
+  autocmd FocusGained,BufEnter,CursorHold,CursorHoldI * silent! checktime
+augroup END
+function! s:CheckTime(timer) abort
+  if mode() ==# 'n' && getcmdwintype() ==# ''
+    silent! checktime
+  endif
+endfunction
+if has('timers') && !exists('s:checktime_timer')
+  let s:checktime_timer = timer_start(2000, function('s:CheckTime'), {'repeat': -1})
+endif
 " }}}
 
 " Section: Vim behavior {{{
@@ -39,16 +63,15 @@ set tabstop=2
 set shiftwidth=2
 set expandtab
 set shiftround
-set foldmethod=syntax
+set foldmethod=indent
 set foldnestmax=2
 " }}}
 
 " Section: Search settings {{{
 set smartcase
 set incsearch
-set hlsearch!
-set wildignore+=*.so,*.swp,*.zip,
-set wildignore+=*.swp,*.zip,*.exe
+set hlsearch
+set wildignore+=*.so,*.swp,*.zip,*.exe,*.pyc,__pycache__/*,.venv/*
 " }}}
 
 " Section: CAPS mode {{{
@@ -66,4 +89,8 @@ set ruler
 set mouse-=a
 set list listchars=tab:\ \ ,trail:~,extends:>,precedes:<
 set nowrap
+" }}}
+
+" Section: Diff {{{
+set diffopt+=algorithm:histogram,indent-heuristic,linematch:60
 " }}}
