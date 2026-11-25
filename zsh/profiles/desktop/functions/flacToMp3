@@ -1,0 +1,2 @@
+# flacToMp3 <file>: same as fileToMp3.
+fileToMp3 "$@"

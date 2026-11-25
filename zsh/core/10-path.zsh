@@ -4,6 +4,7 @@ typeset -gU path fpath
 
 path=(
   $HOME/.local/bin(N/)
+  $HOME/.atuin/bin(N/)
   $path
   $HOME/.cargo/bin(N/)
 )

@@ -1,0 +1,2 @@
+# sshpwd <ssh args...>: ssh with password auth only (ignore keys and agent).
+ssh -o 'PreferredAuthentications password' -o 'PubkeyAuthentication no' "$@"

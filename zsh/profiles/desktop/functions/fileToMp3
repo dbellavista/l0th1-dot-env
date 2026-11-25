@@ -1,0 +1,4 @@
+# fileToMp3 <file>: encode the audio track to a 320k <file>.mp3 in the current dir.
+local file=$1 outfile=${1:t}.mp3
+rm -f -- $outfile
+ffmpeg -i "$file" -ab 320k -vn "$outfile"

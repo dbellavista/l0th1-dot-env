@@ -1,0 +1,6 @@
+# gfpull: pull develop, the main branch (main or master) and tags.
+local main=main
+git show-ref --verify --quiet refs/heads/main || main=master
+git checkout develop && git pull origin develop &&
+  git checkout $main && git pull origin $main &&
+  git pull origin --tags

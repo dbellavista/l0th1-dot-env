@@ -1,5 +1,7 @@
-# gfpush: push develop, main and tags (git-flow release finish).
+# gfpush: push develop, the main branch (main or master) and tags (git-flow release finish).
 # Uses plain git: autoloaded functions don't expand aliases like gco/ggp.
+local main=main
+git show-ref --verify --quiet refs/heads/main || main=master
 git checkout develop && git push origin develop &&
-  git checkout main && git push origin main &&
+  git checkout $main && git push origin $main &&
   git push origin --tags

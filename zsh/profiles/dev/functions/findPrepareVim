@@ -1,0 +1,3 @@
+# findPrepareVim <ag args...>: open every file matching an ag search in vim.
+local -a files=( ${(f)"$(ag -l "$@")"} )
+(( $#files )) && vim -- $files

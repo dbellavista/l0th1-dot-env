@@ -1,0 +1,2 @@
+# watch_sync: watch dirty/writeback memory while a big copy flushes to disk.
+watch -d grep -e Dirty: -e Writeback: /proc/meminfo

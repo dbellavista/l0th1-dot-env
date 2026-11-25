@@ -1,0 +1,5 @@
+# mkvToMov: remux every *.mkv in the current dir to .mov (no re-encoding).
+local f
+for f in *.mkv(N); do
+  ffmpeg -i "$f" -vcodec copy -acodec copy -f mov "${f%.mkv}.mov"
+done
