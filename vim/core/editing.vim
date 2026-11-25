@@ -20,7 +20,6 @@ map <LocalLeader>t :NERDTreeToggle<CR>
 " }}}
 
 " Section: Formatting {{{
-nnoremap <C-Q> :ALEFix<CR>
 imap <S-Tab> <Esc><<i
 map <F10> :echo "hi<" . synIDattr(synID(line("."),col("."),1),"name") . '> trans<'
 \ . synIDattr(synID(line("."),col("."),0),"name") . "> lo<"

@@ -52,7 +52,7 @@ function! L0th1OverlayDirs() abort
   return filter(l:dirs, 'isdirectory(v:val)')
 endfunction
 
-for s:name in ['options', 'plugins', 'ui', 'editing', 'filetypes', 'commands']
+for s:name in ['options', 'plugins', 'lsp', 'ui', 'editing', 'filetypes', 'commands']
   execute 'source' fnameescape(g:l0th1_vim . '/core/' . s:name . '.vim')
 endfor
 
